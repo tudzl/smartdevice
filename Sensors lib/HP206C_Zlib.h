@@ -1,6 +1,7 @@
 /*
- * File name  : HP20x_dev.h
+ * File name  : HP206C_Zlib.h
  * Description: Driver for I2C PRECISION BAROMETER AND ALTIMETER [HP206C]
+ * Author     : Zell(Ling Zhou)  2019.10 fix bugs!
  * Author     : Oliver Wang from Seeed studio
  * Version    : V0.1
  * Create Time: 2014/04
@@ -91,10 +92,10 @@ public:
 	void begin();
 	bool begin2(uint8_t addr);
 	/* Read sensor data */
-	ulong ReadTemperature(void);
+	long ReadTemperature(void);  // fixed bugs by zell 2019.10.10
 	ulong ReadPressure(void);
 	ulong ReadAltitude(void);
-	long ReadAltitude2(void);  // fixed bugs by zell
+	long ReadAltitude2(void);  // fixed bugs by zell  2019.10.09
 	/* Enable or disable compensation */	
 	void HP20X_EnableCompensate(void);
 	void HP20X_DisableCompensate(void);

@@ -1,5 +1,5 @@
 /*
- * File name  : HP20x_dev.cpp
+ * File name  : HP206C_Zlib.cpp
  * Description: Driver for I2C PRECISION BAROMETER AND ALTIMETER [HP206C]
  * Author     : Zell(Ling Zhou)  2019.10 fix bugs!
  * Author     : Oliver Wang from Seeed studio
@@ -11,7 +11,7 @@
 /****************************************************************************/
 /***        Include files                                                 ***/
 /****************************************************************************/
-#include "HP206_dev.h"
+#include "HP206C_Zlib.h"
 #include <Wire.h>
 #include <Arduino.h>
 //#include "ZFilter.h"
@@ -100,15 +100,15 @@ void HP20x_dev::begin()
  **@ Function name: ReadTemperature
  **@ Description: Read Temperature from HP20x_dev
  **@ Input:
- **@ OutPut:
+ **@ OutPut: long
  **@ Retval:
 */
-ulong HP20x_dev::ReadTemperature(void)
+long HP20x_dev::ReadTemperature(void)
 {   
 	HP20X_IIC_WriteCmd(HP20X_WR_CONVERT_CMD|OSR_CFG);	//ADC convert
 	delay(OSR_ConvertTime);			                    //difference OSR_CFG will be difference OSR_ConvertTime
 	HP20X_IIC_WriteCmd(HP20X_READ_T);      
-	ulong Temperature = HP20X_IIC_ReadData();
+	long Temperature = HP20X_IIC_ReadData();
 	return Temperature;		
 }
 
