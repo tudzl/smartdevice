@@ -7,18 +7,18 @@
   Author: Ling zhou
   Email: tudzl@hotmail.de
 
-  
+
   Version: 8
   Date: 2018 / 02 / 17
   Author: Austin St. Aubin
   Email: AustinSaintAubin@gmail.com
-  
-  Description: 
-    ESP32 Scans for i2c Devices  
-  
+
+  Description:
+    ESP32 Scans for i2c Devices
+
   Version History:
     Version 8
-      Added preprocessor statments for display 
+      Added preprocessor statments for display
     Version 6
       Added i2c Ports
       Added OLED output
@@ -40,12 +40,12 @@
       can be found in many places.
       For example on the Arduino.cc forum.
       The original author is not known.
-      
+
   Notes:
-  
+
     This sketch tests the standard 7-bit addresses
     Devices with higher bit address might not be seen properly.
-    
+
   ============================================================================= */
 
 // [# Preprocessor Statements #]
@@ -57,14 +57,14 @@
 
 // Initialize the OLED display using I2C
 #ifdef OLED_DISPLAY_SSD1306
-  //#include "SSD1306.h"   // alias for `#include "SSD1306Wire.h"  ori
-  #include "Adafruit_SSD1306.h"  //by zl
+//#include "SSD1306.h"   // alias for `#include "SSD1306Wire.h"  ori
+#include "Adafruit_SSD1306.h"  //by zl
 #elif defined OLED_DISPLAY_SH1106
-  #include "SH1106.h"  // alias for `#include "SH1106Wire.h"`
+#include "SH1106.h"  // alias for `#include "SH1106Wire.h"`
 #elif !OLED_DISPLAY
-  #warning "OLED Display Disabled"
+#warning "OLED Display Disabled"
 #else
-  #error "Undefined OLED Display Type"
+#error "Undefined OLED Display Type"
 #endif
 /*For a connection via I2C using brzo_i2c (must be installed) include
     #include <brzo_i2c.h>  Only needed for Arduino 1.6.5 and earlier
@@ -73,7 +73,7 @@
   For a connection via SPI include
     #include <SPI.h>  Only needed for Arduino 1.6.5 and earlier
     #include "SSD1306Spi.h"
-    #include "SH1106SPi.h" 
+    #include "SH1106SPi.h"
 */
 
 // [ Global Pin Constants / Varables ]
@@ -88,9 +88,9 @@
 
 // [ Global Classes ]
 #ifdef OLED_DISPLAY_SSD1306
-  SSD1306  display(0x3c, I2C_SDA_PIN, I2C_SCL_PIN);
+SSD1306  display(0x3c, I2C_SDA_PIN, I2C_SCL_PIN);
 #elif defined OLED_DISPLAY_SH1106
-  SH1106 display(0x3c, I2C_SDA_PIN, I2C_SCL_PIN);
+SH1106 display(0x3c, I2C_SDA_PIN, I2C_SCL_PIN);
 #endif
 
 
@@ -103,29 +103,29 @@ unsigned char blink_status = 1;
 
 void setup()
 {
-   //Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-   Wire.begin();
+  //Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.begin();
   // Serial
   Serial.begin(115200);
   Serial.println("\nSmart device I2C Scanner");
-
+  pinMode(ledPin, OUTPUT);
   // OLED
-  #if OLED_DISPLAY
-    display.init();
-    display.flipScreenVertically();
-    display.setContrast(255);
-    display.setFont(ArialMT_Plain_10);
-    display.setColor(WHITE);
-    // - - - - - - - - - - - - - -
-    display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    display.drawString(DISPLAY_WIDTH, 0, "v8");
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.drawString(0, 0, "I2C Scanner w/ OLED");
-    // - - - - - - - - - - - - - -
-    display.drawLine(0, 12, DISPLAY_WIDTH, 12);
-    // - - - - - - - - - - - - - -
-    display.display();
-  #endif
+#if OLED_DISPLAY
+  display.init();
+  display.flipScreenVertically();
+  display.setContrast(255);
+  display.setFont(ArialMT_Plain_10);
+  display.setColor(WHITE);
+  // - - - - - - - - - - - - - -
+  display.setTextAlignment(TEXT_ALIGN_RIGHT);
+  display.drawString(DISPLAY_WIDTH, 0, "v8");
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(0, 0, "I2C Scanner w/ OLED");
+  // - - - - - - - - - - - - - -
+  display.drawLine(0, 12, DISPLAY_WIDTH, 12);
+  // - - - - - - - - - - - - - -
+  display.display();
+#endif
 }
 
 
@@ -133,20 +133,23 @@ void loop()
 {
   byte error, address;
   int nDevices;
-  blink_status = 1 -blink_status;
+
+  //led
+  blink_status = 1 - blink_status;
   digitalWrite(ledPin, blink_status);
+
   Serial.println("Sensor Scanning...");
 
 
- dev_cnt = 0;
-  #if OLED_DISPLAY
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.drawString(0, 14, "Scanning...");
-    display.display();
-  #endif
-  
+  dev_cnt = 0;
+#if OLED_DISPLAY
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(0, 14, "Scanning...");
+  display.display();
+#endif
+
   nDevices = 0;
-  for(address = 1; address < 127; address++ ) {
+  for (address = 1; address < 127; address++ ) {
     // The i2c_scanner uses the return value of
     // the Write.endTransmisstion to see if
     // a device did acknowledge to the address.
@@ -155,64 +158,64 @@ void loop()
 
     if (error == 0) {
       nDevices++;
-      
+
       Serial.print("Sensor found @ 0x");
       //dev_cnt++;
-      
-      if (address<16) 
+
+      if (address < 16)
         Serial.print("0");
-      Serial.print(address,HEX);
+      Serial.print(address, HEX);
       Serial.println("  !");
-      
-      #if OLED_DISPLAY
-        display.drawString(((nDevices -1) % 4) * 32, 23 + (round((nDevices -1) /4) *10), (String)nDevices + ":x" + String(address, HEX));
-        display.display();
-      #endif
+
+#if OLED_DISPLAY
+      display.drawString(((nDevices - 1) % 4) * 32, 23 + (round((nDevices - 1) / 4) * 10), (String)nDevices + ":x" + String(address, HEX));
+      display.display();
+#endif
     }
-    else if (error==4) 
+    else if (error == 4)
     {
       Serial.print("Unknow error @ 0x");
-      if (address<16) 
+      if (address < 16)
         Serial.print("0");
-      Serial.println(address,HEX);
+      Serial.println(address, HEX);
 
-      #if OLED_DISPLAY
-        display.drawString(((nDevices -1) % 4) * 32, 23 + (round((nDevices -1) /4) *10), "!:x" + String(address, HEX));
-        display.display();
-      #endif
-    }    
+#if OLED_DISPLAY
+      display.drawString(((nDevices - 1) % 4) * 32, 23 + (round((nDevices - 1) / 4) * 10), "!:x" + String(address, HEX));
+      display.display();
+#endif
+    }
   }
   if (nDevices == 0) {
     Serial.println("No I2C devices found\n");
-    
-    #if OLED_DISPLAY
-        display.drawString(0, 23 , "No I2C devices found");
-        display.display();
-    #endif
+
+#if OLED_DISPLAY
+    display.drawString(0, 23 , "No I2C devices found");
+    display.display();
+#endif
   } else {
-    Serial.printf("scanning done, total devices found: %d\n",nDevices);
-    
-    #if OLED_DISPLAY
-        display.drawString(((nDevices -0) % 4) * 32, 23 + (round((nDevices -0) /4) *10), "done");
-        display.display();
-    #endif
+    Serial.printf("scanning done, total devices found: %d\n", nDevices);
+
+#if OLED_DISPLAY
+    display.drawString(((nDevices - 0) % 4) * 32, 23 + (round((nDevices - 0) / 4) * 10), "done");
+    display.display();
+#endif
   }
 
-// DEBUGING
-//  for(address = 40; address < 52; address++ ) {
-//    nDevices++;
-//    display.drawString(((nDevices -1) % 4) * 32, 23 + (round((nDevices -1) /4) *10), (String)nDevices + ":x" + String(address, HEX));
-//    Serial.println(address,HEX);
-//  }
-  
+  // DEBUGING
+  //  for(address = 40; address < 52; address++ ) {
+  //    nDevices++;
+  //    display.drawString(((nDevices -1) % 4) * 32, 23 + (round((nDevices -1) /4) *10), (String)nDevices + ":x" + String(address, HEX));
+  //    Serial.println(address,HEX);
+  //  }
+
   delay(3000);           // wait 5 seconds for next scan
 
-  #if OLED_DISPLAY
-    // Clear Bottom of Display
-    display.setColor(BLACK);
-    display.fillRect(0, 13, DISPLAY_WIDTH, DISPLAY_HEIGHT - 13);
-    display.setColor(WHITE);
-  #endif
+#if OLED_DISPLAY
+  // Clear Bottom of Display
+  display.setColor(BLACK);
+  display.fillRect(0, 13, DISPLAY_WIDTH, DISPLAY_HEIGHT - 13);
+  display.setColor(WHITE);
+#endif
 
   run_cnt++;
   Serial.printf("System run count: %d\r\n", run_cnt);
