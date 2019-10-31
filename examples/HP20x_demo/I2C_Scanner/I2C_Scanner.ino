@@ -93,6 +93,14 @@
   SH1106 display(0x3c, I2C_SDA_PIN, I2C_SCL_PIN);
 #endif
 
+
+//---sys run vars---
+
+unsigned long run_cnt  = 0 ;
+// Blink ledPin refers to smart device ESP32 GPIO 2
+const int ledPin = 2;
+unsigned char blink_status = 1;
+
 void setup()
 {
    //Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
@@ -125,7 +133,8 @@ void loop()
 {
   byte error, address;
   int nDevices;
-
+  blink_status = 1 -blink_status;
+  digitalWrite(ledPin, blink_status);
   Serial.println("Sensor Scanning...");
 
   #if OLED_DISPLAY
@@ -192,7 +201,7 @@ void loop()
 //    Serial.println(address,HEX);
 //  }
   
-  delay(5000);           // wait 5 seconds for next scan
+  delay(3000);           // wait 5 seconds for next scan
 
   #if OLED_DISPLAY
     // Clear Bottom of Display
@@ -200,4 +209,7 @@ void loop()
     display.fillRect(0, 13, DISPLAY_WIDTH, DISPLAY_HEIGHT - 13);
     display.setColor(WHITE);
   #endif
+
+  run_cnt++;
+  Serial.printf("System run count: %d\r\n", run_cnt);
 }
