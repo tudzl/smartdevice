@@ -95,7 +95,7 @@
 
 
 //---sys run vars---
-
+unsigned char dev_cnt = 0;
 unsigned long run_cnt  = 0 ;
 // Blink ledPin refers to smart device ESP32 GPIO 2
 const int ledPin = 2;
@@ -137,6 +137,8 @@ void loop()
   digitalWrite(ledPin, blink_status);
   Serial.println("Sensor Scanning...");
 
+
+ dev_cnt = 0;
   #if OLED_DISPLAY
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     display.drawString(0, 14, "Scanning...");
@@ -155,6 +157,8 @@ void loop()
       nDevices++;
       
       Serial.print("Sensor found @ 0x");
+      //dev_cnt++;
+      
       if (address<16) 
         Serial.print("0");
       Serial.print(address,HEX);
@@ -186,7 +190,7 @@ void loop()
         display.display();
     #endif
   } else {
-    Serial.println("done\n");
+    Serial.printf("scanning done, total devices found: %d\n",nDevices);
     
     #if OLED_DISPLAY
         display.drawString(((nDevices -0) % 4) * 32, 23 + (round((nDevices -0) /4) *10), "done");
