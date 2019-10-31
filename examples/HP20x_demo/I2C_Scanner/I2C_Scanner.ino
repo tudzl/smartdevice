@@ -216,4 +216,5 @@ void loop()
 
   run_cnt++;
   Serial.printf("System run count: %d\r\n", run_cnt);
+  Serial.println("---------------------------\n");
 }
