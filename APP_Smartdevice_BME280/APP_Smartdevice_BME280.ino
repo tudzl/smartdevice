@@ -1,5 +1,7 @@
 
-/* this code is working as APP launcher compatib
+/*  Smart device Main PCB code for ESP32 wrover and 6 sensors
+    this code is working as APP launcher compatibale
+    Version 6.0 Light , BME280 working!  2019.11.1
     Version 5.0  Add altitude base , offset diff measure function
     Version 4.0  HP206C bug fixed!  altitude: ulong changed to long
     Version 3.1  Zfilter and kalman filter works!
@@ -7,7 +9,8 @@
     need to improve BME680 T reading accuracy!
     m5stack fire arduino device test app for ENV unit and BME680 module +HP206C  module
     Author ling zhou, 16.8.2019
-    note: need add library Adafruit_BMP280 from library manage
+    note: ONboard sensors: BME280+ICM-20948+MCP9808T-E/MS+BH1750+MAX44009EDT+analog Mic ICS-40181
+
     note: need add library Adafruit_BME680 from library manage
 
 */
@@ -32,10 +35,11 @@
 #include <BH1750FVI.h>
 #include <HP206C_Zlib.h>
 #include <ZFilter.h>
+#include <MAX44009.h>
 //For #include "filename" the preprocessor searches first in the same directory as the file containing the directive, and then follows the search path used for the #include <filename> form. This method is normally used to include programmer-defined header files.
 
 
-
+#define SEALEVELPRESSURE_HPA (1013.25)
 //bmp280 address:  0x76
 //HP206C address:  0x76
 //BME680 address:  0x76-->0x77:
@@ -44,7 +48,9 @@ unsigned char BME280_add = 0x77;
 unsigned char BME680_add = 0x77;
 unsigned char hp206_add = 0x76;
 unsigned char bmp280_add = 0x76;
+unsigned char MAX44009_add = 0x4B;
 //DHT address:  0x5C
+MAX44009 MAX44009_light;  //bot light sensor
 DHT12 dht12; //Preset scale CELSIUS and ID 0x5c.
 BH1750FVI::eDeviceMode_t BH_DEVICEMODE = BH1750FVI::k_DevModeContHighRes2;
 BH1750FVI Top_LightSensor(BH_DEVICEMODE);
@@ -55,17 +61,20 @@ HP20x_dev HP206;  // I2C  0x76
 POWER m5_power;
 //global vars
 float lux_BH1750 = 0;
+float lux_max44009 = 0;
 float pressure = 0;
 float T_bmp = 0;
 float Alt_bmp = 0;
 double Altitude = 0; // in meter @ 25 degree
 double Altitude_offset = 0;   // in meter
-bool top_light_ok = false;
+bool top_light_ok = false;  //BH
+bool bot_light_ok = false; //max
 bool dht12_ok = false;
 bool BME280_ok = false;
 bool bmp280_ok = false;
 bool bme680_ok =  false;
 bool HP206_ok = false;
+
 unsigned int HP206_DSR = 256; // down sampling rate
 float hum = 0;
 float tmperature = 0;
@@ -183,43 +192,90 @@ void setup() {
 
 
 
-  Serial.println(F("Smart device V2 sensor test..."));
+  Serial.println(F("<<<Smart device V2 sensor test>>>"));
 
   if (Top_LightSensor.begin2(Bh1750_add))
   {
     dev_cnt++;
     top_light_ok = true;
-    Serial.println("Top light sensor BH1750 is connected!");
+    Serial.println("* Top light sensor BH1750 is connected!");
     delay(50);
   }
 
+
+  if (MAX44009_light.begin2(MAX44009_add))
+  {
+    dev_cnt++;
+    bot_light_ok = true;
+    Serial.println("* Bot light sensor Max44009 is connected!");
+    delay(50);
+
+    //Two key features of the IC analog design are its ultra-low
+    //current consumption (typically 0.65μA) and an extremely
+    //wide dynamic light range that extends from 0.045 lux to
+    //188,000 lux—more than a 4,000,000 to 1 range.
+  }
 
   if (bme280.begin(BME280_add))
   {
     BME280_ok  = true ;
     dev_cnt++;
-    Serial.println("Bosch BME280 sensor is connected!");
+    Serial.println("* Bosch BME280 sensor is connected!");
+    Serial.print("Bosch SensorID is: 0x");
+    Serial.println(bme280.sensorID(), 16);
+    Serial.println("-- BME280 Default setting --");
+    Serial.println("normal mode, 16x oversampling for all, filter off,");
+    Serial.println("0.5ms standby period");
+    Serial.println("Zfilter and Kalman filter enabled!");
+
+
     delay(50);
+
+    //        Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+    //        Serial.print("        ID of 0x60 represents a BME 280.\n");
+    //        Serial.print("        ID of 0x61 represents a BME 680.\n");
+    /*
+      // indoor navigation
+      Serial.println("-- Indoor Navigation Scenario --");
+      Serial.println("normal mode, 16x pressure / 2x temperature / 1x humidity oversampling,");
+      Serial.println("0.5ms standby period, filter 16x");
+      bme.setSampling(Adafruit_BME280::MODE_NORMAL,
+                    Adafruit_BME280::SAMPLING_X2,  // temperature
+                    Adafruit_BME280::SAMPLING_X16, // pressure
+                    Adafruit_BME280::SAMPLING_X1,  // humidity
+                    Adafruit_BME280::FILTER_X16,
+                    Adafruit_BME280::STANDBY_MS_0_5 );
+
+      // suggested rate is 25Hz
+      // 1 + (2 * T_ovs) + (2 * P_ovs + 0.5) + (2 * H_ovs + 0.5)
+      // T_ovs = 2
+      // P_ovs = 16
+      // H_ovs = 1
+      // = 40ms (25Hz)
+      // with standby time that should really be 24.16913... Hz
+      delayTime = 41;
+    */
 
   }
 
 
 
-  M5.Lcd.clear(BLACK);
-
-  M5.Lcd.setCursor(0, 220);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setTextColor(GREEN, BLACK);
-  if (dht12_ok)
-    M5.Lcd.println("ENV DHT12+BMP280 test V2.1");
-  else if (HP206_ok)
-    M5.Lcd.println("ENV HP206 test V2.0");
-  else  M5.Lcd.println("ENV BME680 test V1.5");
+  //  M5.Lcd.clear(BLACK);
+  //
+  //  M5.Lcd.setCursor(0, 220);
+  //  M5.Lcd.setTextSize(2);
+  //  M5.Lcd.setTextColor(GREEN, BLACK);
+  //  if (dht12_ok)
+  //    M5.Lcd.println("ENV DHT12+BMP280 test V2.1");
+  //  else if (HP206_ok)
+  //    M5.Lcd.println("ENV HP206 test V2.0");
+  //  else  M5.Lcd.println("ENV BME680 test V1.5");
 
   //lcd.font(lcd.FONT_Default) #改变字体
 
   //M5.Speaker.beep(); //bug!! cause system restart!!
   //M5.Speaker.begin();
+  Serial.println("Main loop running now...");
 }
 
 
@@ -238,42 +294,44 @@ void loop() {
     Serial.printf("Top light =  %.1f Lux\r\n", lux_BH1750 );
   }
 
-  if (Gas_EN == 0) {
-    //disable gas heater
-    //setGasHeater(uint16_t heaterTemp, uint16_t heaterTime);
-    bme680.setGasHeater(0, 0);
-    /* Create a ramp heat waveform in 3 steps */
-    //gas_sensor.gas_sett.heatr_temp = 320; /* degree Celsius */
-    //gas_sensor.gas_sett.heatr_dur = 150; /* milliseconds */
-  }
-  else {
-    bme680.setGasHeater(320, 150); // 320*C for 150 ms
-  }
-  //bme680_ok = true ;
-  int Akku_level = m5_power.getBatteryLevel();
-
-
-  if (dht12_ok) {
-    tmperature = dht12.readTemperature(); // not very accurate
-
-    hum = dht12.readHumidity();
-    Serial.printf("DHT12 T =  %2.2f*C Humidity= %0.2f %%\r\n", tmperature, hum);
+  if (bot_light_ok) {
+    lux_max44009 = MAX44009_light.get_lux();
+    Serial.printf("Bot light =  %.1f Lux\r\n", lux_max44009 );
   }
 
-  //-----------HP206 ----------------
+  //  if (Gas_EN == 0) {
+  //    //disable gas heater
+  //    //setGasHeater(uint16_t heaterTemp, uint16_t heaterTime);
+  //    bme680.setGasHeater(0, 0);
+  //    /* Create a ramp heat waveform in 3 steps */
+  //    //gas_sensor.gas_sett.heatr_temp = 320; /* degree Celsius */
+  //    //gas_sensor.gas_sett.heatr_dur = 150; /* milliseconds */
+  //  }
+  //  else {
+  //    bme680.setGasHeater(320, 150); // 320*C for 150 ms
+  //  }
+  //  //bme680_ok = true ;
+  //  int Akku_level = m5_power.getBatteryLevel();
 
-  if (HP206_ok) {
-    //ulong data
-    tmperature = (float)HP20x.ReadTemperature() / 100.0; // degree seems not very accurate
-    pressure = (float)HP20x.ReadPressure() / 100; // in hPA
-    Altitude = (double)HP20x.ReadAltitude2() / 100; // in Meter.Bug fixed!!! 42949636m if P > 1017 mBar  ; 42949648M @ 1016 Hpa
-    Serial.printf("HP206: T =  %2.2f*C ，pressure：%0.2f hpa，  Altitude: %6.2f M \r\n", tmperature, pressure, Altitude);
+
+  //----BME280------------------
+
+
+  if (BME280_ok) {
+    tmperature = bme280.readTemperature();
+    hum = bme280.readHumidity();
+    pressure = (float)bme280.readPressure() / 100.0; // in hPA
+    Altitude = (float)bme280.readAltitude(SEALEVELPRESSURE_HPA) ;
+    Serial.printf("BME280 Temp. = %2.2f*C ; Humidity= %0.2f %%  ;pressure= %0.2f hpa\r\n", tmperature, hum, pressure);
+    Serial.printf("Altitude= %6.2f M \r\n", Altitude);
+
     if (filter_on) {
-      T_filter = t_filter.Filter(tmperature);
+      //ZFilter
+      //T_filter = t_filter.Filter(tmperature);
       P_filter = p_filter.Filter(pressure);
       A_filter = a_filter.Filter(Altitude);
-
-      T_Kfilter = t_kalman.Filter(tmperature);
+      // kalman filter
+      //T_Kfilter = t_kalman.Filter(tmperature);
       P_Kfilter = p_kalman.Filter(pressure);
       A_Kfilter = a_kalman.Filter(Altitude);
       //renew filters
@@ -288,10 +346,58 @@ void loop() {
       }
       filter_val = filter_val / Filter_len;
       filter_buf[idx] = A_filter;
-      Serial.printf("ZFiltered T =  %2.2f*C ，pressure：%0.2f hpa，  Altitude: %0.2f M \r\n", T_filter, P_filter, A_filter);
-      Serial.printf("KalmanFiltered T =  %2.2f*C ，pressure：%0.2f hpa，  Altitude: %0.2f M \r\n", T_Kfilter, P_Kfilter, A_Kfilter);
+      //debug outputs
+      //Serial.printf("ZFiltered pressure：%0.2f hpa，  Altitude: %0.2f M \r\n",  P_filter, A_filter);
+      //Serial.printf("KalmanFiltered pressure：%0.2f hpa，  Altitude: %0.2f M \r\n",  P_Kfilter, A_Kfilter);
       Serial.printf("Filtered Altitude= %0.2f M \r\n", filter_val);
       //Serial.printf("%0.2f;%0.2f;%0.2f\r\n" ,pressure,P_filter,P_Kfilter); // for test plot
+    }
+
+
+  }
+
+
+
+  //  if (dht12_ok) {
+  //    tmperature = dht12.readTemperature(); // not very accurate
+  //
+  //    hum = dht12.readHumidity();
+  //    Serial.printf("DHT12 T =  %2.2f*C Humidity= %0.2f %%\r\n", tmperature, hum);
+  //  }
+
+  //-----------HP206 ----------------
+
+  if (HP206_ok) {
+    //ulong data
+    tmperature = (float)HP20x.ReadTemperature() / 100.0; // degree seems not very accurate
+    pressure = (float)HP20x.ReadPressure() / 100; // in hPA
+    Altitude = (double)HP20x.ReadAltitude2() / 100; // in Meter.Bug fixed!!! 42949636m if P > 1017 mBar  ; 42949648M @ 1016 Hpa
+    Serial.printf("HP206: T =  %2.2f*C ，pressure：%0.2f hpa，  Altitude: %6.2f M \r\n", tmperature, pressure, Altitude);
+    if (filter_on) {
+      //ZFilter
+      //T_filter = t_filter.Filter(tmperature);
+      P_filter = p_filter.Filter(pressure);
+      A_filter = a_filter.Filter(Altitude);
+      // kalman filter
+      //T_Kfilter = t_kalman.Filter(tmperature);
+      P_Kfilter = p_kalman.Filter(pressure);
+      A_Kfilter = a_kalman.Filter(Altitude);
+      //renew Altitude filter buf
+      for (idx = Filter_len - 1; idx > 0; idx--) {
+        filter_buf[idx] = filter_buf[idx - 1];
+      }
+      filter_buf[0] = A_filter;
+      //calc average values
+      filter_val = 0;
+      for (idx = 0; idx < Filter_len; idx++) {
+        filter_val = filter_val + filter_buf[idx];
+      }
+      filter_val = filter_val / Filter_len;
+      filter_buf[idx] = A_filter;
+      Serial.printf("ZFiltered pressure：%0.2f hpa，  Altitude: %0.2f M \r\n",  P_filter, A_filter);
+      Serial.printf("KalmanFiltered pressure：%0.2f hpa，  Altitude: %0.2f M \r\n",  P_Kfilter, A_Kfilter);
+      Serial.printf("Filtered Altitude= %0.2f M \r\n", filter_val);
+      Serial.printf("%0.2f;%0.2f;%0.2f\r\n" , pressure, P_filter, P_Kfilter); // for test plot
     }
 
 
@@ -368,16 +474,16 @@ void loop() {
     M5.Lcd.printf("Gas: %0.1d Kohms\r\n", Gas / 1000);
   }
   //meter display
-  M5.Lcd.setTextSize(2); //size 2 to 8
-  M5.Lcd.setTextColor(LIGHTGREY, BLACK);
-  M5.Lcd.printf("Base:%0.1f M; Cur:%0.1f M; Dif:%0.1f M \r\n", height_base, height_new, height_diff);
-
-
-
-  M5.Lcd.setCursor(0, 220);
-  M5.Lcd.setTextSize(2); //size 2 to 8
-  M5.Lcd.setTextColor(ORANGE, BLACK);
-  M5.Lcd.printf("Akku: %3d%%   Run:%d", Akku_level, run_cnt);
+  //  M5.Lcd.setTextSize(2); //size 2 to 8
+  //  M5.Lcd.setTextColor(LIGHTGREY, BLACK);
+  //  M5.Lcd.printf("Base:%0.1f M; Cur:%0.1f M; Dif:%0.1f M \r\n", height_base, height_new, height_diff);
+  //
+  //
+  //
+  //  M5.Lcd.setCursor(0, 220);
+  //  M5.Lcd.setTextSize(2); //size 2 to 8
+  //  M5.Lcd.setTextColor(ORANGE, BLACK);
+  //  M5.Lcd.printf("Akku: %3d%%   Run:%d", Akku_level, run_cnt);
 
   M5.update(); // This function reads The State of Button A and B and C.
 
@@ -416,6 +522,6 @@ void loop() {
   run_cnt++;
   //delay(10); //100ms
   Serial.printf("System run count: %d\r\n", run_cnt);
-  Serial.println("---------------------------\n");
+  Serial.println("---------------------------");
 
 }
