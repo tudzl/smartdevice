@@ -1,6 +1,7 @@
 
 /*  Smart device Main PCB code for ESP32 wrover and 6 sensors
     this code is working as APP launcher compatibale
+    Version 6.2 Wifi config switch through S2 btn  2019.11.8
     Version 6.1 MQTT working!  2019.11.8
     Version 6.0 Light , BME280 working!  2019.11.1
     Version 5.0  Add altitude base , offset diff measure function
@@ -145,8 +146,17 @@ void buttonA_longPressed(void) {
   //M5.Speaker.beep();  // too laud
   //M5.Speaker.tone(800, 20);
   //M5.lcd.setBrightness(30);
-
+  MQTT_active = 1-MQTT_active;
   Serial.println("buttonA/S1 is longPressed");
+  Serial.printf("MQTT_active: %d", MQTT_active);
+  if (false ==MQTT_active){
+    Serial.printf("Smart device MQTT OFF now");
+    client.publish("strtd/SmartDevice_01/online", "");
+  }
+  else {
+    Serial.printf("Smart device MQTT go Online now");
+    client.publish("strtd/SmartDevice_01/online", "now online!");
+  }
 }
 
 //void buttonB_wasPressed(void) {
@@ -184,15 +194,15 @@ const char* ssid = "TC";
 const char* password = "sthz@2020";
 const char* ssid2 = "WH10";
 const char* password2 = "Zell9090";
-
+unsigned char wifi_config = 2 ;
 // Add your MQTT Broker IP address, example:
 //const char* mqtt_server = "192.168.1.144";
 const char* mqtt_server = "st.devmolv.com";
 const char* device_ID = "SmartDevice_01";
 //Strings are actually one-dimensional array of characters terminated by a null character '\0'.
-const char* MQTT_SensorMsg_head = "stsmd/SmartDevice_01/global";
-char* MQTT_payload ;
-const char  Data_ava_flag = B1001111 ;
+const char* MQTT_SensorMsg_head = "stsmd/SmartDevice_01/local";
+char MQTT_payload[100] ;
+const char  Data_ava_flag = B1001111 ; //ori 1000111
 
 WiFiClient Smartdevice_01;
 PubSubClient client(Smartdevice_01);
@@ -200,19 +210,24 @@ PubSubClient client(Smartdevice_01);
 long lastMsg = 0;
 char msg[64];
 char tmp_string[32];
-int value = 0;
-
+//int value = 0;
+bool MQTT_active = true;
 
 void setup_wifi() {
   delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Wifi try Connecting to ");
-  Serial.println(ssid2);
 
-  //WiFi.begin(ssid, password);
-  WiFi.begin(ssid2, password2);
 
+  if (1 == wifi_config)
+  { Serial.println(ssid);
+    WiFi.begin(ssid, password);
+  }
+  else if (2 == wifi_config)
+  { Serial.println(ssid);
+    WiFi.begin(ssid2, password2);
+  }
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -240,7 +255,7 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
 
   // If a message is received on the topic esp32/output, you check if the message is either "on" or "off".
   // Changes the output state according to the message
-  if (String(topic) == "esp32/output") {
+  if (String(topic) == "test_ESP32_smartdevice_server") {
     Serial.print("Changing output to ");
     if (messageTemp == "on") {
       Serial.println("on");
@@ -280,9 +295,11 @@ void setup() {
   Wire.begin();
   pinMode(ledPin, OUTPUT);
   if (digitalRead(BUTTON_A_PIN) == 0) {
-    Serial.println("Will Load menu binary");
-    updateFromFS(SD);
-    ESP.restart();
+    Serial.println("Will Load Wifi config_1, default is config_2");
+    wifi_config = 1;
+    //Serial.println("Will Load menu binary");
+    //updateFromFS(SD);
+    //ESP.restart();
   }
   dev_cnt = 0;
 
@@ -362,7 +379,9 @@ void setup() {
   Serial.printf("Wifi ok! setting MQTT server: %s port 1883\r\n", mqtt_server);
   client.setServer(mqtt_server, 1883);
   client.setCallback(MQTT_RX_callback);
-  client.publish("stsmd/Smartdevice_01/info", "device online now");
+  client.publish("stsmd/SmartDevice_01/info", "device online now");
+  client.publish("strtd/SmartDevice_01/info", "device online now");
+  // m5mqtt.publish(str('strtd/'+Device_ID+'/online'), "Smart device is online!")
   Serial.println("MQTT sent:stsmd/Smartdevice_01/info:device online now");
   Serial.println("Main loop running now...");
 
@@ -607,8 +626,8 @@ void loop() {
 
   if (run_cnt % 5 == 0) {
 
-    
-    Serial.printf("MQTT status: %d\r\n",client.state());
+
+    Serial.printf("MQTT status: %d\r\n", client.state());
     Serial.printf("MQTT try sending data now...\r\n");
     //    char buf1[10] = "string1";
     //    char buf2[10] = "string2";
@@ -626,37 +645,37 @@ void loop() {
     client.publish("stsmd/Smartdevice_01/local", msg);
     Serial.printf("MQTT Msg 1 sent: stsmd/Smartdevice_01/local: %.1f Lux\r\n", lux_max44009);
 
-    //-----------
-    /*
-      //data_payload = Data_ava_flag+str("[")+str(T)+str(",")+str(H)+str(",")+str(A)+str(",")+str(Vibration)+str(",")+str(BH_data)+str("] ")
-      sprintf(MQTT_payload, "%c", Data_ava_flag);
-      //strcpy(MQTT_payload, Data_ava_flag);
-      strcat(MQTT_payload, "[");
-      //T
-      dtostrf(tmperature, 3, 2, msg);
-      strcat(MQTT_payload, msg);
-      strcat(MQTT_payload, ",");
-      //H
-      dtostrf(hum, 2, 2, msg);
-      strcat(MQTT_payload, msg);
-      strcat(MQTT_payload, ",");
-      //A
-      dtostrf(pressure, 4, 2, msg);
-      strcat(MQTT_payload, msg);
-      strcat(MQTT_payload, ",");
 
-      //vib need add real vals later
-      //dtostrf(pressure, 4, 2, msg);
-      //strcat(MQTT_payload, msg);
-      //strcat(MQTT_payload, ",");
-      strcat(MQTT_payload, "0,");
-      //light
-      dtostrf(lux_max44009, 6, 1, msg);
-      strcat(MQTT_payload, msg); //light
-      strcat(MQTT_payload, "]");
-    */
-    //Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
-    //client.publish(MQTT_SensorMsg_head, MQTT_payload);
+
+    //data_payload = Data_ava_flag+str("[")+str(T)+str(",")+str(H)+str(",")+str(A)+str(",")+str(Vibration)+str(",")+str(BH_data)+str("] ")
+    sprintf(MQTT_payload, "%c", Data_ava_flag);
+    //strcpy(MQTT_payload, Data_ava_flag);
+    strcat(MQTT_payload, "[");
+    //T
+    dtostrf(tmperature, 3, 2, msg);
+    strcat(MQTT_payload, msg);
+    strcat(MQTT_payload, ",");
+    //H
+    dtostrf(hum, 2, 2, msg);
+    strcat(MQTT_payload, msg);
+    strcat(MQTT_payload, ",");
+    //A
+    dtostrf(pressure, 4, 2, msg);
+    strcat(MQTT_payload, msg);
+    strcat(MQTT_payload, ",");
+
+    //vib need add real vals later
+    //dtostrf(pressure, 4, 2, msg);
+    //strcat(MQTT_payload, msg);
+    //strcat(MQTT_payload, ",");
+    strcat(MQTT_payload, "0,");
+    //light
+    dtostrf(lux_max44009, 6, 1, msg);
+    strcat(MQTT_payload, msg); //light
+    strcat(MQTT_payload, "]");
+
+    Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
+    client.publish(MQTT_SensorMsg_head, MQTT_payload);
     //Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
     //combine msg data
     //Data_ava_flag  0b1000111
