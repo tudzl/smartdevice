@@ -40,6 +40,7 @@
 //For #include "filename" the preprocessor searches first in the same directory as the file containing the directive, and then follows the search path used for the #include <filename> form. This method is normally used to include programmer-defined header files.
 
 //WIFI+MQTT
+#define MQTT_KEEPALIVE 30
 #include <WiFi.h>
 #include <PubSubClient.h>  //MQTT
 //mqtt.subscribe(str('stsmd/'+Device_ID+'/alert')
@@ -195,6 +196,7 @@ const char  Data_ava_flag = B1001111 ;
 
 WiFiClient Smartdevice_01;
 PubSubClient client(Smartdevice_01);
+
 long lastMsg = 0;
 char msg[64];
 char tmp_string[32];
@@ -590,22 +592,6 @@ void loop() {
   }
 
 
-  //reset the altitude offset to current altitude
-  //  if (M5.BtnB.pressedFor(250) ) {
-  //    buttonB_longPressed();
-  //    Serial.printf("BtnB.wasPressed\r\n");
-  //  }
-  //
-  //  if (M5.BtnB.wasPressed() ) {
-  //    buttonB_wasPressed();
-  //    Serial.printf("BtnB.wasPressed\r\n");
-  //  }
-  //  if (M5.BtnC.wasPressed() ) {
-  //    buttonC_wasPressed();
-  //    Serial.printf("BtnC.wasPressed\r\n");
-  //  }
-
-
   if (Wrover_module)
     delay(200); //100ms
 
@@ -613,16 +599,16 @@ void loop() {
   //delay(100); //100ms
   Serial.printf("System run count: %d\r\n", run_cnt);
   Serial.println("---------------------------");
-
+  //MQTT routine
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
 
   if (run_cnt % 5 == 0) {
 
-    //MQTT routine
-    if (!client.connected()) {
-      reconnect();
-    }
-    client.loop();
-
+    
+    Serial.printf("MQTT status: %d\r\n",client.state());
     Serial.printf("MQTT try sending data now...\r\n");
     //    char buf1[10] = "string1";
     //    char buf2[10] = "string2";
@@ -638,7 +624,7 @@ void loop() {
     dtostrf(lux_max44009, 6, 1, msg);
     Serial.printf("MQTT raw Msg 1:%s\r\n", msg);
     client.publish("stsmd/Smartdevice_01/local", msg);
-    Serial.printf("MQTT Msg 1: stsmd/Smartdevice_01/local: %.1f Lux\r\n", lux_max44009);
+    Serial.printf("MQTT Msg 1 sent: stsmd/Smartdevice_01/local: %.1f Lux\r\n", lux_max44009);
 
     //-----------
     /*
@@ -669,14 +655,24 @@ void loop() {
       strcat(MQTT_payload, msg); //light
       strcat(MQTT_payload, "]");
     */
-    Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
+    //Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
     //client.publish(MQTT_SensorMsg_head, MQTT_payload);
     //Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
     //combine msg data
     //Data_ava_flag  0b1000111
     //data_payload = Data_ava_flag+str("[")+str(T)+str(",")+str(H)+str(",")+str(A)+str(",")+str(Vibration)+str(",")+str(BH_data)+str("] ")
     //printf.(msg);
-
+    /*
+        long now = millis();
+        if (now - lastMsg > 2000) {
+          lastMsg = now;
+          ++value;
+          snprintf (msg, 50, "hello world #%ld", value);
+          Serial.print("Publish message: ");
+          Serial.println(msg);
+          client.publish("outTopic", msg);
+    */
   }
+
 
 }
