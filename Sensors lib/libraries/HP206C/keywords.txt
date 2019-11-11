@@ -1,0 +1,38 @@
+#######################################
+# Syntax Coloring Map HD20x_dev
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+HD20x_dev	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+HP20X_IIC_WriteCmd	KEYWORD2
+HP20X_IIC_ReadReg	KEYWORD2
+ReadTemperature		KEYWORD2
+ReadPressure	KEYWORD2
+ReadAltitude	KEYWORD2
+Hex_to_Dec	KEYWORD2
+HP20X_IIC_ReadData	KEYWORD2
+HP20X_IIC_ReadData3byte	KEYWORD2
+HP20X_IIC_WriteReg	KEYWORD2
+isAvailable	KEYWORD2
+begin	KEYWORD2 
+KalmanFilter	KEYWORD2
+Filter	KEYWORD2
+Gaussian_Noise_Cov	KEYWORD2
+#######################################
+# Instances (KEYWORD2)
+#######################################
+HP20x	KEYWORD2
+TwoWire	KEYWORD2
+KalmanFilter	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+ 
