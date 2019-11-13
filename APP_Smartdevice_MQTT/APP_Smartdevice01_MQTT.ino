@@ -30,7 +30,7 @@
 */
 
 
-/***********************ICM_20948 9-axis motion sensor*****************************************
+/***********************ICM20948 9-axis motion sensor*****************************************
    Example1_Basics.ino
    ICM 20948 Arduino Library Demo
    Use the default configuration to stream 9-axis IMU data
@@ -66,7 +66,7 @@
 #include <MAX44009.h>  //Wide 0.045 Lux to 188,000 Lux Range
 #include "Adafruit_MCP9808.h"
 //For #include "filename" the preprocessor searches first in the same directory as the file containing the directive, and then follows the search path used for the #include <filename> form. This method is normally used to include programmer-defined header files.
-#include "ICM_20948.h"  // Click here to get the library: http://librarymanager/All#SparkFun_ICM_20948_IMU
+#include "ICM_20948.h"  // Click here to get the library: http://librarymanager/All#SparkFun_ICM20948_IMU
 
 
 //WIFI+MQTT
@@ -100,7 +100,7 @@ Adafruit_BME680 bme680; // I2C  0x76
 Adafruit_BMP280 bmp280;  // I2C  0x76
 Adafruit_BME280 bme280;  // I2C  0x77
 HP20x_dev HP206;  // I2C  0x76
-//ICM_20948_I2C def
+//ICM20948_I2C def
 ICM_20948_I2C ICM20948 ; //9-axis motion
 
 POWER m5_power;
@@ -120,6 +120,7 @@ bool bmp280_ok = false;
 bool bme680_ok =  false;
 bool HP206_ok = false;
 bool MCP9808_ok = false;
+bool MCP9808_ENA = false; // enable or disable MCP9808 sensor
 bool ICM20948_ok = false;
 
 unsigned int HP206_DSR = 256; // down sampling rate
@@ -141,6 +142,7 @@ float ACC_X_offset = 0;
 float ACC_Y_offset = 0;
 float ACC_Z_offset = 0;
 float Vibration = 0;
+const float Gravity = 9.8; //The value 9.8 m/s² is valid for the object at the surface of earth (at sea level).
 /* KalmanFilter Instance */
 bool filter_on = true;
 ZFilter t_filter;    //temperature filter
@@ -187,7 +189,7 @@ const char* ssid = "TC";
 const char* password = "sthz@2020";
 const char* ssid2 = "WH10";
 const char* password2 = "Zell9090";
-const char* ssid3 = "HUAWEI_XM"; //test only
+const char* ssid3 = "HUAWEI-XM"; //test only
 const char* password3 = "Zell9090";
 char ssid_new [12];
 char password_new [12];
@@ -435,8 +437,8 @@ void setup() {
   if (MCP9808.begin(MCP9808_add)) {
     MCP9808_ok = true;
     dev_cnt++;
-    MCP9808.shutdown();
-    MCP9808.wakeup();   // wake up, delay 250ms; ready to read!
+    //MCP9808.shutdown();
+    //MCP9808.wakeup();   // wake up, delay 250ms; ready to read!
     Serial.println("* MCP9808 -40°C to +125°C ±0.5°C Digital Temperature Sensor is connected!");
     Serial.printf("  MCP9808 Chip Rev.: %d \r\n", MCP9808.getRevision(MCP9808_add));
 
@@ -540,9 +542,7 @@ void setup() {
   //9 axis motion init.
   bool ICM_initialized = false;
   while ( !ICM_initialized ) {
-
-
-    //0 use ICM_20948_I2C_ADDR_AD0  0x68
+    //0 use ICM20948_I2C_ADDR_AD0  0x68
     ICM20948.begin( Wire, 0 );
 
 
@@ -556,10 +556,13 @@ void setup() {
       Serial.println( "* 9 axis motion sensor ICM-20948 is initialized!" );
       ICM20948_ok;
       dev_cnt++;
-      Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+
     }
   }
+  ICM20948_config();
+  Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
 
+  //----------sensor all init. above----------------
   Serial.printf("# Sensor initialization finished, total sensor connected %d !\r\n", dev_cnt);
   Serial.println("Setting up Wifi and MQTT now...");
   setup_wifi();
@@ -793,12 +796,19 @@ void loop() {
   //  M5.Lcd.printf("Akku: %3d%%   Run:%d", Akku_level, run_cnt);
 
   //-------------MCP9808 TA bugs!------------
-  if (MCP9808_ok) {
+  if (MCP9808_ok && MCP9808_ENA) {
     MCP9808_T = MCP9808.readTemperature();
     Serial.printf("MCP9808 PCB Temperature =  %.2f °C\r\n", MCP9808_T);
     Serial.printf("%%%MCP9808 Temperature raw =  %d  \r\n", MCP9808.readTempRaw());
+    //uint16_t regval = MCP9808.read16(MCP9808_REG_CONFIG);
+    Serial.printf("  MCP9808 Config REG: %d \r\n", MCP9808.read16(MCP9808_REG_CONFIG));
     //
-    MCP9808.shutdown();
+    //MCP9808.shutdown();
+    //tests only
+    //    MCP9808_T = MCP9808.readTempC();
+    //    Serial.printf("MCP9808.readTempC() =  %5.2f °C\r\n", MCP9808_T);
+    //    MCP9808_T = MCP9808.readTemperature2();
+    //    Serial.printf("MCP9808.readTemperature2() =  %5.2f °C\r\n", MCP9808_T);
 
   }
 
@@ -826,10 +836,7 @@ void loop() {
   //MCP9808.wakeup();   // wake up, delay 250ms; ready to read!
   run_cnt++;
   //delay(100); //100ms
-  long now = millis();
-  //if (now - lastMsg > 5000) {
-  //}
-  lastMsg = now;
+
 
 
 
@@ -921,7 +928,7 @@ void loop() {
       strcat(MQTT_payload, msg);
       strcat(MQTT_payload, ",");
 
-      //vibration 
+      //vibration
       dtostrf(Vibration, 6, 2, msg);
       strcat(MQTT_payload, msg);
       strcat(MQTT_payload, ",");
@@ -964,9 +971,13 @@ void loop() {
       client.publish(MQTT_GlobalMsg_head, MQTT_payload);
     }
   }//end run_cnt/20 MQTT global
-  Serial.printf("System run count: %d  Loop time cost: %d ms\r\n", run_cnt, now - lastMsg);
+  long now = millis();
+  Serial.printf("------- System run count: %d  Loop time cost: %d ms -------\r\n", run_cnt, now - lastMsg);
+  Serial.println("");
 
-  Serial.println("---------------------------");
+  //if (now - lastMsg > 5000) {
+  //}
+  lastMsg = now;
 
 
 
@@ -1103,7 +1114,6 @@ void printScaledAcc( ICM_20948_AGMT_t agmt) {
   printFormattedFloat( ICM20948.accZ(), 5, 2 );
   Serial.print(" ]");
   //Serial.print(" ], Gyr (DPS) [ ");
-
   Serial.println();
 }
 
@@ -1124,9 +1134,9 @@ float calc_vibration(ICM_20948_AGMT_t agmt) {
   float ACC_Z = ICM20948.accZ();
   //float ACC_total = (ACC_X ^ 2 + ACC_Y ^ 2 + ACC_Z ^ 2) ^ 0.5;
   float Vibration = (  sq(ACC_X - ACC_X_offset) + sq(ACC_Y - ACC_Y_offset) + sq(ACC_Z - ACC_Z_offset) ) ;
-  Serial.printf("$$$ Vib calc1: %f \r\n",Vibration);
+  //Serial.printf("$$$ Vib calc1: %f \r\n",Vibration);
   Vibration = sqrt(Vibration);
-  Serial.printf("$$$ Vib calc2: %f \r\n",Vibration);
+  //Serial.printf("$$$ Vib calc2: %f \r\n",Vibration);
   return Vibration;
 }
 
@@ -1146,4 +1156,106 @@ void reset_ACC_offset(ICM_20948_AGMT_t agmt) {
   ACC_Y_offset = ICM20948.accY();
   ACC_Z_offset = ICM20948.accZ();
 
+}
+
+void ICM20948_config(void) {
+
+  // The next few configuration functions accept a bit-mask of sensors for which the settings should be applied.
+
+  // Set Gyro and Accelerometer to a particular sample mode
+  // options: ICM20948_Sample_Mode_Continuous
+  //          ICM20948_Sample_Mode_Cycled
+  ICM20948.setSampleMode( (ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), ICM_20948_Sample_Mode_Continuous );
+  if ( ICM20948.status != ICM_20948_Stat_Ok) {
+    Serial.print(F("setSampleMode Continuous returned: "));
+    Serial.println(ICM20948.statusString());
+  }
+  // Set full scale ranges for both acc and gyr
+  ICM_20948_fss_t myFSS;  // This uses a "Full Scale Settings" structure that can contain values for all configurable sensors
+
+  myFSS.a = gpm4;         // (ICM20948_ACCEL_CONFIG_FS_SEL_e)
+  // gpm2
+  // gpm4
+  // gpm8
+  // gpm16
+
+  myFSS.g = dps500;       // (ICM20948_GYRO_CONFIG_1_FS_SEL_e)
+  // dps250
+  // dps500
+  // dps1000
+  // dps2000
+
+  ICM20948.setFullScale( (ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), myFSS );
+  if ( ICM20948.status != ICM_20948_Stat_Ok) {
+    Serial.print(F("set Acc FullScale to 4g, GYRO to 500dps, returned: "));
+    Serial.println(ICM20948.statusString());
+  }
+
+
+  // Set up Digital Low-Pass Filter configuration
+  ICM_20948_dlpcfg_t myDLPcfg;            // Similar to FSS, this uses a configuration structure for the desired sensors
+  myDLPcfg.a = acc_d473bw_n499bw;         // (ICM_20948_ACCEL_CONFIG_DLPCFG_e)
+  // acc_d246bw_n265bw      - means 3db bandwidth is 246 hz and nyquist bandwidth is 265 hz
+  // acc_d111bw4_n136bw
+  // acc_d50bw4_n68bw8
+  // acc_d23bw9_n34bw4
+  // acc_d11bw5_n17bw
+  // acc_d5bw7_n8bw3        - means 3 db bandwidth is 5.7 hz and nyquist bandwidth is 8.3 hz
+  // acc_d473bw_n499bw
+
+  myDLPcfg.g = gyr_d361bw4_n376bw5;       // (ICM_20948_GYRO_CONFIG_1_DLPCFG_e)
+  // gyr_d196bw6_n229bw8
+  // gyr_d151bw8_n187bw6
+  // gyr_d119bw5_n154bw3
+  // gyr_d51bw2_n73bw3
+  // gyr_d23bw9_n35bw9
+  // gyr_d11bw6_n17bw8
+  // gyr_d5bw7_n8bw9
+  // gyr_d361bw4_n376bw5
+
+  ICM20948.setDLPFcfg( (ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), myDLPcfg );
+  if ( ICM20948.status != ICM_20948_Stat_Ok) {
+    Serial.print(F("Set up Digital Low-Pass Filter configuration returned: "));
+    Serial.println(ICM20948.statusString());
+  }
+
+  // Choose whether or not to use DLPF
+  // Here we're also showing another way to access the status values, and that it is OK to supply individual sensor masks to these functions
+  ICM_20948_Status_e accDLPEnableStat = ICM20948.enableDLPF( ICM_20948_Internal_Acc, false );
+  ICM_20948_Status_e gyrDLPEnableStat = ICM20948.enableDLPF( ICM_20948_Internal_Gyr, false );
+  Serial.print(F("Enable DLPF for Accelerometer returned: ")); Serial.println(ICM20948.statusString(accDLPEnableStat));
+  Serial.print(F("Enable DLPF for Gyroscope returned: ")); Serial.println(ICM20948.statusString(gyrDLPEnableStat));
+  // Now we're going to set up interrupts. There are a lot of options, but for this test we're just configuring the interrupt pin and enabling interrupts to tell us when new data is ready
+  /*
+      ICM_20948_Status_e  cfgIntActiveLow         ( bool active_low );
+      ICM_20948_Status_e  cfgIntOpenDrain         ( bool open_drain );
+      ICM_20948_Status_e  cfgIntLatch             ( bool latching );                          // If not latching then the interrupt is a 50 us pulse
+
+      ICM_20948_Status_e  cfgIntAnyReadToClear    ( bool enabled );                           // If enabled, *ANY* read will clear the INT_STATUS register. So if you have multiple interrupt sources enabled be sure to read INT_STATUS first
+
+      ICM_20948_Status_e  cfgFsyncActiveLow       ( bool active_low );
+      ICM_20948_Status_e  cfgFsyncIntMode         ( bool interrupt_mode );                    // Can ue FSYNC as an interrupt input that sets the I2C Master Status register's PASS_THROUGH bit
+
+      ICM_20948_Status_e  intEnableI2C            ( bool enable );
+      ICM_20948_Status_e  intEnableDMP            ( bool enable );
+      ICM_20948_Status_e  intEnablePLL            ( bool enable );
+      ICM_20948_Status_e  intEnableWOM            ( bool enable );
+      ICM_20948_Status_e  intEnableWOF            ( bool enable );
+      ICM_20948_Status_e  intEnableRawDataReady   ( bool enable );
+      ICM_20948_Status_e  intEnableOverflowFIFO   ( uint8_t bm_enable );
+      ICM_20948_Status_e  intEnableWatermarkFIFO  ( uint8_t bm_enable );
+  */
+  /*
+    ICM20948.cfgIntActiveLow(true);                      // Active low to be compatible with the breakout board's pullup resistor
+    ICM20948.cfgIntOpenDrain(false);                     // Push-pull, though open-drain would also work thanks to the pull-up resistors on the breakout
+    ICM20948.cfgIntLatch(true);                          // Latch the interrupt until cleared
+    Serial.print(F("cfgIntLatch returned: "));
+    Serial.println(myICM.statusString());
+
+    ICM20948.intEnableRawDataReady(true);                // enable interrupts on raw data ready
+    Serial.print(F("intEnableRawDataReady returned: "));
+    Serial.println(myICM.statusString());
+  */
+  Serial.println();
+  Serial.println(F("§ 9 Axis Motion sensor Configuration complete!"));
 }
