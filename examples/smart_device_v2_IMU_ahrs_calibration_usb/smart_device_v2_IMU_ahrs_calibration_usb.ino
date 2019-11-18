@@ -1,5 +1,6 @@
 //modified to fit for smart device v2 by ling zhou  2019.11.14
-
+// to calibrate icm-20948 Mag sensor , connect to PC, generate MAG X_Y_Z offsets and soft iron compensation matrix
+// After flashing, unplug the usb cable, re-insert usb plug, then everything works!
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <DPEng_ICM20948_AK09916.h>
@@ -33,15 +34,20 @@ void setup()
   // Wait for the Serial Monitor to open (comment out to run without Serial Monitor)
   // while(!Serial);
 
-  Serial.println(F("smart device DPEng 9 DOF AHRS Calibration Example")); Serial.println("");
+  Serial.println(F("smart device v2 DPEng 9 DOF ICM-20948 AHRS Calibration program")); 
+   Serial.println(F("<<<Ling zhou, 18.11.2018>>>"));
+   Serial.println(F("<<<PC running MotionCal.exe>>>")); 
+  Serial.println("");
 
   Wire.begin();
   pinMode(ledPin, OUTPUT);
+  delay(100);
   // Initialize the sensors.
   if (!dpEng.begin(ICM20948_ACCELRANGE_4G, GYRO_RANGE_250DPS, ICM20948_ACCELLOWPASS_50_4_HZ))
   {
     /* There was a problem detecting the sensor ... check your connections */
     Serial.println("Ooops, no sensor detected ... Check your wiring!");
+    Serial.print("Try to unplug the usb cable, re-insert usb plug, then everything should work!!!");
     while (1);
   }
 
