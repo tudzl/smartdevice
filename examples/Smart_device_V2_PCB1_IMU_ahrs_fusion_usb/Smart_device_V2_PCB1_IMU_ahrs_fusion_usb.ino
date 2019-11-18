@@ -8,11 +8,16 @@
 #include <Madgwick_DPEng.h>
 #include <DPEng_ICM20948_AK09916.h>
 
-
+const float Gravity_HZ = 9.7936 ;
+const float Gravity_0 = 9.80665 ;
+float Linear_ACC = 0 ;
+float Linear_ACC_max = 0;
+float Tilt_A = 0;
+float ACC_X, ACC_Y, ACC_Z;
 // Create sensor instance.
 DPEng_ICM20948 dpEng = DPEng_ICM20948(0x948A, 0x948B, 0x948C);
 
-
+bool yaw_compensation_EN = true ;
 float yaw_offsets = 24.7 ; //added by zl ,offsets between ecompass heading and physical compass north
 // Mag calibration values are calculated via ahrs_calibration example sketch results（MotionCal.exe）.
 // These values must be determined for each baord/environment.
@@ -40,7 +45,7 @@ float gyro_zero_offsets[3]      = { 0.0F, 0.0F, 0.0F };
 Mahony_DPEng filter;
 //Madgwick_DPEng filter;
 
-float Tilt_A = 0;
+
 //PCB related paras
 const int ledPin = 2;
 unsigned char blink_status = 1;
@@ -110,7 +115,8 @@ void loop(void)
   float roll = filter.getRoll();
   float pitch = filter.getPitch();
   float heading = filter.getYaw(); //mag poles
-  heading = heading - yaw_offsets ;//!!!! 2019.11.18 only for PCB #1 !!!!
+  if (yaw_compensation_EN)
+    heading = heading - yaw_offsets ;//!!!! 2019.11.18 only for PCB #1 !!!!
   now = millis() - now;
   //Serial.print(millis());
   Serial.print(" - Orientation(Yaw,Pitch,Row): ");
@@ -122,8 +128,13 @@ void loop(void)
   Tilt_A = Calc_tilt(dpEng.accel_raw.x, dpEng.accel_raw.y, dpEng.accel_raw.z);
   if (pitch < 0)
     Tilt_A = -Tilt_A;
-  Serial.printf("-->PCB Tilt: %.1f degree\r\n", Tilt_A);
-  Show_raw_values();
+  Serial.printf("-->PCB Tilt in steady state: %.1f degree\r\n", Tilt_A);
+  //Show_raw_values();
+  show_sci_values();
+  Linear_ACC = Calc_linearACC (ACC_X, ACC_Y, ACC_Z) ;
+  Linear_ACC = Linear_ACC / Gravity_0;
+  Linear_ACC_max = max(Linear_ACC_max,Linear_ACC);
+  Serial.printf("-->Device Linear Acc: %.2f G; Max value: %.2f G\r\n", Linear_ACC,Linear_ACC_max);
   Serial.println("");
   Serial.printf("------- System benchmark run count: %d  loop time cost: %d ms  -------\r\n", run_cnt, now);
   Serial.println("");
@@ -131,6 +142,42 @@ void loop(void)
   delay(20);
 }
 
+
+void show_sci_values (void) {
+
+
+  sensors_event_t aevent, gevent, mevent;
+
+  /* Get a new sensor event */
+  dpEng.getEvent(&aevent, &gevent, &mevent);
+  ACC_X = aevent.acceleration.x;
+  ACC_Y = aevent.acceleration.y;
+  ACC_Z = aevent.acceleration.z;
+
+  /* Display the accel results (acceleration is measured in m/s^2) */
+  Serial.print("A ");
+  Serial.print("X: "); Serial.print(aevent.acceleration.x, 4); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(aevent.acceleration.y, 4); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(aevent.acceleration.z, 4); Serial.print("  ");
+  Serial.println("m/s^2");
+
+  /* Display the gyro results (gyro data is in g) */
+  Serial.print("G ");
+  Serial.print("X: "); Serial.print(gevent.gyro.x, 1); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(gevent.gyro.y, 1); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(gevent.gyro.z, 1); Serial.print("  ");
+  Serial.println("g");
+
+  /* Display the mag results (mag data is in uTesla) */
+  Serial.print("M ");
+  Serial.print("X: "); Serial.print(mevent.magnetic.x, 1); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(mevent.magnetic.y, 1); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(mevent.magnetic.z, 1); Serial.print("  ");
+  Serial.println("uT");
+
+  Serial.println("");
+
+}
 void Show_raw_values( void) {
 
   sensors_event_t accel_event;
@@ -162,8 +209,18 @@ void Show_raw_values( void) {
   Serial.print(dpEng.mag_raw.z);
   Serial.println();
 
+
+
 }
 
+float Calc_linearACC ( float acc_x, float acc_y, float acc_z) {
+
+  float Linear_ACC = 0 ;
+  float R =  sq(acc_x ) + sq(acc_y) + sq(acc_z)  ;
+  Linear_ACC = sqrt(R - sq(Gravity_0));
+
+  return Linear_ACC;
+}
 
 float Calc_tilt ( float acc_x, float acc_y, float acc_z) {
 
