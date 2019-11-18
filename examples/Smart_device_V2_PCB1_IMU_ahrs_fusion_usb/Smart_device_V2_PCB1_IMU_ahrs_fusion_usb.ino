@@ -1,3 +1,5 @@
+//Version 2.1, added yaw_offsets
+//Version 2.0,added Calc_tilt function using acc_X+Y+Z data, 2019.11.18
 //modified to fit for smart device v2 by ling zhou  2019.11.14
 //original code from  DPEng_ICM20948
 #include <Wire.h>
@@ -10,6 +12,8 @@
 // Create sensor instance.
 DPEng_ICM20948 dpEng = DPEng_ICM20948(0x948A, 0x948B, 0x948C);
 
+
+float yaw_offsets = 24.7 ; //added by zl ,offsets between ecompass heading and physical compass north
 // Mag calibration values are calculated via ahrs_calibration example sketch results（MotionCal.exe）.
 // These values must be determined for each baord/environment.
 // See the image in this sketch folder for the values used
@@ -19,7 +23,7 @@ DPEng_ICM20948 dpEng = DPEng_ICM20948(0x948A, 0x948B, 0x948C);
 float mag_offsets[3]            = { -16.8F, -13.68F, 10.33F };  // for 1# PCB smart device v2 ICM-20948  2019.11.18
 
 // Soft iron error compensation matrix ，  obtained from MotionCal.exe
-float mag_softiron_matrix[3][3] = { 
+float mag_softiron_matrix[3][3] = {
   {  1.000,  -0.002,  0.006 },
   {  -0.002,  1.014,  0.002 },
   {  0.006,   0.002,  0.996 }
@@ -36,7 +40,7 @@ float gyro_zero_offsets[3]      = { 0.0F, 0.0F, 0.0F };
 Mahony_DPEng filter;
 //Madgwick_DPEng filter;
 
-
+float Tilt_A = 0;
 //PCB related paras
 const int ledPin = 2;
 unsigned char blink_status = 1;
@@ -105,7 +109,8 @@ void loop(void)
   // and example of working with quaternion data.
   float roll = filter.getRoll();
   float pitch = filter.getPitch();
-  float heading = filter.getYaw(); //mag poles 
+  float heading = filter.getYaw(); //mag poles
+  heading = heading - yaw_offsets ;//!!!! 2019.11.18 only for PCB #1 !!!!
   now = millis() - now;
   //Serial.print(millis());
   Serial.print(" - Orientation(Yaw,Pitch,Row): ");
@@ -114,7 +119,10 @@ void loop(void)
   Serial.print(pitch);
   Serial.print(" ");
   Serial.println(roll);
-
+  Tilt_A = Calc_tilt(dpEng.accel_raw.x, dpEng.accel_raw.y, dpEng.accel_raw.z);
+  if (pitch < 0)
+    Tilt_A = -Tilt_A;
+  Serial.printf("-->PCB Tilt: %.1f degree\r\n", Tilt_A);
   Show_raw_values();
   Serial.println("");
   Serial.printf("------- System benchmark run count: %d  loop time cost: %d ms  -------\r\n", run_cnt, now);
@@ -123,7 +131,7 @@ void loop(void)
   delay(20);
 }
 
-void Show_raw_values( void){
+void Show_raw_values( void) {
 
   sensors_event_t accel_event;
   sensors_event_t gyro_event;
@@ -153,5 +161,17 @@ void Show_raw_values( void){
   Serial.print(',');
   Serial.print(dpEng.mag_raw.z);
   Serial.println();
-  
+
+}
+
+
+float Calc_tilt ( float acc_x, float acc_y, float acc_z) {
+
+  float tilt_angle = 0 ;
+  float unit_g =  sq(acc_x ) + sq(acc_y) + sq(acc_z)  ;
+  unit_g = sqrt(unit_g);
+  //cos(tilt_angle)= acc_z /unit_g ;
+  tilt_angle = acos(acc_z / unit_g); //radians
+  tilt_angle = tilt_angle * RAD_TO_DEG ; //convert to degree,#define RAD_TO_DEG 57.295779513082320876798154814105
+  return tilt_angle;
 }
