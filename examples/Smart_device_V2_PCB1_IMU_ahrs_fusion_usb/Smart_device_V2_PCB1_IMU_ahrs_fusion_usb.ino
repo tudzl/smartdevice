@@ -1,17 +1,38 @@
+
+/***********************ICM20948 9-axis motion sensor*****************************************
+  Smart device v2 Main PCB code for ESP32 wrover and ICM20948 9 DOF motion sensor, Max Linear acc meter
+ ***************************************************************/
+
+//Version 2.2, added FFAT
 //Version 2.1, added yaw_offsets
 //Version 2.0,added Calc_tilt function using acc_X+Y+Z data, 2019.11.18
 //modified to fit for smart device v2 by ling zhou  2019.11.14
 //original code from  DPEng_ICM20948
+/*
+  "C:\\Users\\ling\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\1.0.4/tools/xtensa-esp32-elf/bin/xtensa-esp32-elf-size" -A "C:\\Users\\ling\\AppData\\Local\\Temp\\arduino_build_594389/Smart_device_V2_PCB1_IMU_ahrs_fusion_usb.ino.elf"
+  Sketch uses 327486 bytes (10%) of program storage space. Maximum is 3145728 bytes.
+  Global variables use 16604 bytes (5%) of dynamic memory, leaving 311076 bytes for local variables. Maximum is 327680 bytes.
+*/
+//I've found in my experience FatFs (plus wearleveling) to be faster than SPIFFS.
+#include "FS.h"
+#include "FFat.h"
+#define FORMAT_FFAT false // You only need to format FFat the first time you run a test
+// This file should be compiled with 'Partition Scheme' (in Tools menu)
+// set to '16M Flash (3MB APP/9MB FATFS)'  for smart device 16M wrover module
+
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Mahony_DPEng.h>
 #include <Madgwick_DPEng.h>
 #include <DPEng_ICM20948_AK09916.h>
+#include <M5Stack.h>
 
+char tmp_string[64];
 const float Gravity_HZ = 9.7936 ;
 const float Gravity_0 = 9.80665 ;
 float Linear_ACC = 0 ;
 float Linear_ACC_max = 0;
+float Linear_ACC_max_last = 0; // for file writting
 float Tilt_A = 0;
 float ACC_X, ACC_Y, ACC_Z;
 // Create sensor instance.
@@ -55,7 +76,9 @@ long now = 0;
 
 void setup()
 {
-  Serial.begin(115200);
+
+  M5.begin();
+  //Serial.begin(115200);
 
   // Wait for the Serial Monitor to open (comment out to run without Serial Monitor)
   // while(!Serial);
@@ -71,6 +94,27 @@ void setup()
   }
 
   filter.begin();
+
+  Serial.setDebugOutput(true);
+  if (FORMAT_FFAT) FFat.format();
+  if (!FFat.begin()) {
+    Serial.println("Smart device FFat Mount Failed");
+    return;
+  }
+  unsigned mem_space = FFat.totalBytes();
+  Serial.printf("Total space: %10u bytes (%2u MB)\n", mem_space, mem_space / 1024 / 1024);
+  mem_space = FFat.freeBytes();
+  Serial.printf("Free space: %10u bytes (%2u MB)\n", mem_space, mem_space / 1024 / 1024);
+  listDir(FFat, "/", 0);
+  Serial.println("Now read last time Max Linear Acc value:");
+  readFile(FFat, "/Linear_ACC_max.txt");
+  //  writeFile(FFat, "/hello.txt", "Hello ");
+  //  appendFile(FFat, "/hello.txt", "World!\r\n");
+  //  readFile(FFat, "/hello.txt");
+  //  renameFile(FFat, "/hello.txt", "/foo.txt");
+  //  readFile(FFat, "/foo.txt");
+  //  deleteFile(FFat, "/foo.txt");
+
 }
 
 void loop(void)
@@ -79,6 +123,23 @@ void loop(void)
 
   blink_status = 1 - blink_status;
   digitalWrite(ledPin, blink_status);
+
+
+  M5.update(); // This function reads The State of Button A and B and C.
+
+  //toggle gas reading
+  if (M5.BtnA.wasPressed() ) {
+    buttonA_wasPressed();
+    //Serial.printf("BtnA was Pressed\r\n");
+  }
+
+
+
+
+
+
+
+
   now = millis();
   sensors_event_t accel_event;
   sensors_event_t gyro_event;
@@ -119,7 +180,7 @@ void loop(void)
     heading = heading - yaw_offsets ;//!!!! 2019.11.18 only for PCB #1 !!!!
   now = millis() - now;
   //Serial.print(millis());
-  Serial.print(" - Orientation(Yaw,Pitch,Row): ");
+  Serial.print("--> Orientation(Yaw,Pitch,Row): ");
   Serial.print(heading);
   Serial.print(" ");
   Serial.print(pitch);
@@ -128,18 +189,32 @@ void loop(void)
   Tilt_A = Calc_tilt(dpEng.accel_raw.x, dpEng.accel_raw.y, dpEng.accel_raw.z);
   if (pitch < 0)
     Tilt_A = -Tilt_A;
-  Serial.printf("-->PCB Tilt in steady state: %.1f degree\r\n", Tilt_A);
+  Serial.printf("--> PCB Tilt in steady state: %.1f degree\r\n", Tilt_A);
   //Show_raw_values();
   show_sci_values();
-  Linear_ACC = Calc_linearACC (ACC_X, ACC_Y, ACC_Z) ;
-  Linear_ACC = Linear_ACC / Gravity_0;
-  Linear_ACC_max = max(Linear_ACC_max,Linear_ACC);
-  Serial.printf("-->Device Linear Acc: %.2f G; Max value: %.2f G\r\n", Linear_ACC,Linear_ACC_max);
+  Linear_ACC = Calc_linearACC (ACC_X, ACC_Y, ACC_Z) ; // m/s2
+  Linear_ACC = Linear_ACC / Gravity_0; // to G
+  Linear_ACC_max = max(Linear_ACC_max, Linear_ACC);
+  Serial.printf("--> current Linear Acc: %.2f G; Max value: %.2f ; Recorded Max: %.2f G\r\n", Linear_ACC, Linear_ACC_max, Linear_ACC_max_last);
   Serial.println("");
-  Serial.printf("------- System benchmark run count: %d  loop time cost: %d ms  -------\r\n", run_cnt, now);
+  Serial.printf("------- System run count: %d  loop time cost: %d ms  -------\r\n", run_cnt, now);
   Serial.println("");
   run_cnt++;
+  if (run_cnt % 1000 == 0) {
+    Record_max_G();
+    //    Serial.println("Recording max linear ACC value now:");
+    //    if (Linear_ACC_max > Linear_ACC_max_last) {
+    //      Serial.println("Current Linear_ACC_max is larger than previous one, writting files now...");
+    //      dtostrf(Linear_ACC_max, 2, 2, tmp_string);
+    //      //toFloat()
+    //      //sprintf(tmp_string, "%d", run_cnt);
+    //      writeFile(FFat, "/Linear_ACC_max.txt", tmp_string);
+    //      readFile(FFat, "/Linear_ACC_max.txt");
+    //    }
+
+  }
   delay(20);
+
 }
 
 
@@ -217,7 +292,9 @@ float Calc_linearACC ( float acc_x, float acc_y, float acc_z) {
 
   float Linear_ACC = 0 ;
   float R =  sq(acc_x ) + sq(acc_y) + sq(acc_z)  ;
-  Linear_ACC = sqrt(R - sq(Gravity_0));
+  if (R > Gravity_HZ)
+    Linear_ACC = sqrt(R - sq(Gravity_HZ)); // <0 bugs found @ 2019.11.19
+  else Linear_ACC = 0;
 
   return Linear_ACC;
 }
@@ -231,4 +308,134 @@ float Calc_tilt ( float acc_x, float acc_y, float acc_z) {
   tilt_angle = acos(acc_z / unit_g); //radians
   tilt_angle = tilt_angle * RAD_TO_DEG ; //convert to degree,#define RAD_TO_DEG 57.295779513082320876798154814105
   return tilt_angle;
+}
+
+void Record_max_G(void) {
+
+  if (Linear_ACC_max > Linear_ACC_max_last) {
+    Serial.println("Current Linear_ACC_max is larger than previous one, writting files now...");
+    dtostrf(Linear_ACC_max, 2, 2, tmp_string);
+    //toFloat()
+    //sprintf(tmp_string, "%d", run_cnt);
+    writeFile(FFat, "/Linear_ACC_max.txt", tmp_string);
+    readFile(FFat, "/Linear_ACC_max.txt");
+  }
+}
+
+void readFile(fs::FS &fs, const char * path) {
+
+  char buf[32];
+  unsigned int i = 0 ;
+  Serial.printf("Reading file: %s\r\n", path);
+
+  File file = fs.open(path);
+  if (!file || file.isDirectory()) {
+    Serial.println("- failed to open file for reading");
+    return;
+  }
+
+  Serial.println("- read from file:");
+  while (file.available()) {
+    buf[i] = file.read();
+    Serial.write(buf[i]);
+    i++;
+  }
+  Serial.println("");
+  Serial.println("File reading ends here!");
+  String tmp_string = String(buf);
+  Linear_ACC_max_last = tmp_string.toFloat();
+  Serial.printf("Apply %.2f to Linear_ACC_max_last!", Linear_ACC_max_last);
+  Serial.println("");
+}
+
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
+  Serial.printf("Listing directory: %s\r\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("- failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.println(" - not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      Serial.print("  DIR : ");
+      Serial.println(file.name());
+      if (levels) {
+        listDir(fs, file.name(), levels - 1);
+      }
+    } else {
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      Serial.print("\tSIZE: ");
+      Serial.println(file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
+
+void writeFile(fs::FS &fs, const char * path, const char * message) {
+  Serial.printf("Writing file: %s\r\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    Serial.println("- failed to open file for writing");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("- file written");
+  } else {
+    Serial.println("- frite failed");
+  }
+}
+
+void appendFile(fs::FS &fs, const char * path, const char * message) {
+  Serial.printf("Appending to file: %s\r\n", path);
+
+  File file = fs.open(path, FILE_APPEND);
+  if (!file) {
+    Serial.println("- failed to open file for appending");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("- message: 'World!' appended");
+  } else {
+    Serial.println("- append failed");
+  }
+}
+
+void renameFile(fs::FS &fs, const char * path1, const char * path2) {
+  Serial.printf("Renaming file %s to %s\r\n", path1, path2);
+  if (fs.rename(path1, path2)) {
+    Serial.println("- file renamed");
+  } else {
+    Serial.println("- rename failed");
+  }
+}
+
+void deleteFile(fs::FS &fs, const char * path) {
+  Serial.printf("Deleting file: %s\r\n", path);
+  if (fs.remove(path)) {
+    Serial.println("- file deleted");
+  } else {
+    Serial.println("- delete failed");
+  }
+}
+
+//reset Recorded Linear Acc Max to Zero
+void buttonA_wasPressed(void) {
+  //M5.Speaker.beep();  // too laud
+  //M5.Speaker.tone(800, 20);
+  Serial.println(" !--> buttonA/S1 was Pressed");
+  Serial.println("##reset Recorded Linear Acc Max to Zero！");
+  Linear_ACC_max_last = 0;
+  Serial.println("##Recording new max Linear Acc value...");
+  Record_max_G();
+
 }
