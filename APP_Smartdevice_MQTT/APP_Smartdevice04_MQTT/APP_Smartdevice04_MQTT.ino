@@ -123,6 +123,9 @@ POWER m5_power;
 float lux_BH1750 = 0;
 float lux_max44009 = 0;
 float pressure = 0;
+float hum = 0;
+const float BME280_Hum_offset = 17.8 ; // calibration with Fluke 971, 2019.11.26 for #4 PCB
+float tmperature = 0;
 float T_bmp = 0;
 float Alt_bmp = 0;
 double Altitude = 0; // in meter @ 25 degree
@@ -177,7 +180,7 @@ float gyro_zero_offsets[3]      = { 0.0F, 0.0F, 0.0F };
 // Mahony is lighter weight as a filter and should be used
 // on slower systems
 Mahony_DPEng IMU_filter;
-//Madgwick_DPEng IMU_filter;
+//Madgwick_DPEng IMU_filter;  //fast cpu
 
 
 
@@ -186,8 +189,7 @@ Mahony_DPEng IMU_filter;
 
 
 unsigned int HP206_DSR = 256; // down sampling rate
-float hum = 0;
-float tmperature = 0;
+
 
 float MCP9808_T = 0;
 int16_t T_limit_H = 40;
@@ -233,7 +235,7 @@ unsigned long run_cnt = 0;
 unsigned int time_interval = 485; //cycle time
 //---sys run vars---
 unsigned char dev_cnt = 0;
-bool MQTT_active = false;
+bool MQTT_active = true;  // default status after reboot
 //------ Height meter vars
 float height_base =  0;
 float height_new =  0;
@@ -259,6 +261,10 @@ unsigned char wifi_config = 2 ;
 // Add your MQTT Broker IP address, example:
 //const char* mqtt_server = "192.168.1.144";
 const char* mqtt_server = "st.devmolv.com";
+const char* mqtt_server_CMD_topic = "Smartdevice_server_CMD/+";
+const char* mqtt_server_CMD_ssid = "Smartdevice_server_CMD/config_ssid";
+const char* mqtt_server_CMD_passwor = "Smartdevice_server_CMD/config_password";
+const char* mqtt_server_CMD_status= "Smartdevice_server_CMD/status";
 
 //Strings are actually one-dimensional array of characters terminated by a null character '\0'.
 
@@ -266,7 +272,7 @@ const char* MQTT_Info_head =  "stsmd/SmartDevice_04/info"; //for new server api
 const char* MQTT_data_head =  "stsmd/SmartDevice_04/data";
 const char* MQTT_SensorMsg_head = "stsmd/SmartDevice_04/local"; //for old api
 const char* MQTT_GlobalMsg_head = "stsmd/SmartDevice_04/global"; //for old api
-char MQTT_payload[100] ;
+char MQTT_payload[128] ;
 const char  Data_ava_flag = B1001111 ; //ori 1000111
 
 WiFiClient SmartDevice_04;
@@ -279,7 +285,7 @@ char tmp_string[32];
 long now = 0;
 
 
-//reset IMU offsets
+//short press Btn to reset IMU offsets
 void buttonA_wasPressed(void) {
   //M5.Speaker.beep();  // too laud
   //M5.Speaker.tone(800, 20);
@@ -299,22 +305,29 @@ void buttonA_wasPressed(void) {
 
 }
 
-//set the lcd Brightness
+//long press Btn to send online info
 void buttonA_longPressed(void) {
   //M5.Speaker.beep();  // too laud
   //M5.Speaker.tone(800, 20);
   //M5.lcd.setBrightness(30);
   MQTT_active = 1 - MQTT_active;
-  Serial.println(" ！！！buttonA/S1 is longPressed");
-  Serial.printf("##MQTT_active: %d", MQTT_active);
+  Serial.println("");
+  Serial.println(" --^^^--- buttonA/S1 is longPressed !!!");
+  Serial.println("");
+  Serial.printf(" ## MQTT_active: %d", MQTT_active);
   if (false == MQTT_active) {
-    Serial.printf("Smart device MQTT OFF now...\r\n");
+    Serial.printf("-->:Smart device MQTT turn OFF now...\r\n");
+    client.publish(MQTT_Info_head, "offline");
+    delay(50);
     client.publish("strtd/SmartDevice_04/online", "");
   }
   else {
-    Serial.printf("Smart device MQTT go Online now!\r\n");
+    Serial.printf("-->:Smart device MQTT go Online now!\r\n");
+    client.publish(MQTT_Info_head, "online");
+    delay(50);
     client.publish("strtd/SmartDevice_04/online", "now online!");
   }
+  Serial.println("");
 }
 
 //void buttonB_wasPressed(void) {
@@ -361,7 +374,7 @@ void setup_wifi() {
     WiFi.begin(ssid, password);
   }
   else if (2 == wifi_config)
-  { Serial.println(ssid);
+  { Serial.println(ssid2);
     WiFi.begin(ssid2, password2);
   }
 
@@ -408,9 +421,11 @@ void setup_wifi() {
 }
 
 void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
+  Serial.println("");
+  Serial.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
   Serial.print("Message arrived on topic: ");
-  Serial.print(topic);
-  Serial.print(". Message: ");
+  Serial.println(topic);
+  Serial.println("Message content: ");
   String messageTemp;
 
   for (int i = 0; i < length; i++) {
@@ -420,14 +435,14 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
   Serial.println();
 
   // Feel free to add more if statements to control more GPIOs with MQTT
-
-  if (String(topic) == "config_ssid") {
-    Serial.printf("Changing wifi ssid to: %s", messageTemp);
+  //-----wifi config via MQTT CMD
+  if (String(topic) == mqtt_server_CMD_ssid) {//"Smartdevice_server_CMD/config_ssid"
+    Serial.printf("Changing wifi ssid to: %s", String(messageTemp));
     sprintf(ssid_new, "%s", messageTemp);
     //ssid_new = messageTemp;
   }
-  if (String(topic) == "config_password") {
-    Serial.printf("Changing wifi password to %s", messageTemp);
+  if (String(topic) == mqtt_server_CMD_passwor) {//"Smartdevice_server_CMD/config_password"
+    Serial.printf("Changing wifi password to %s", String(messageTemp));
     sprintf(password_new, "%s", messageTemp);
     //ssid_new = messageTemp;
   }
@@ -438,8 +453,8 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
 
   // If a message is received on the topic esp32/output, you check if the message is either "on" or "off".
   // Changes the output state according to the message
-  if (String(topic) == "test_ESP32_smartdevice_server") {
-    Serial.print("Changing output to ");
+  if (String(topic) == mqtt_server_CMD_status) {
+    Serial.print("Changing status to ");
     if (messageTemp == "on") {
       Serial.println("on");
       //digitalWrite(ledPin, HIGH);
@@ -449,17 +464,21 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
       //digitalWrite(ledPin, LOW);
     }
   }
+  Serial.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+  delay (1000);
 }
-//MQTT server reconnect,In the reconnect() function, you can subscribe to MQTT topics. In this case, the ESP32 is only subscribed to the test_ESP32_smartdevice_server:
-void reconnect() {
+//MQTT server reconnect,In the  MQTT_reconnect() function, you can subscribe to MQTT topics. In this case, the ESP32 is only subscribed to the test_ESP32_smartdevice_server:
+void MQTT_reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
+    Serial.print("-->:Attempting MQTT connection...");
     // Attempt to connect
     if (client.connect(device_ID)) {
       Serial.println("connected");
       // Subscribe
-      client.subscribe("test_ESP32_smartdevice_server"); //need change
+      client.subscribe(mqtt_server_CMD_topic); //need change?
+      //client.subscribe("config_ssid"); //need change
+      //client.subscribe("config_password"); //need change
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -477,6 +496,7 @@ void setup() {
 
   Wire.begin();
   pinMode(ledPin, OUTPUT);
+  wifi_config = 2;
   if (digitalRead(BUTTON_A_PIN) == 0) {
     Serial.println("Will Load Wifi config_1, default is config_2");
     wifi_config = 1;
@@ -576,6 +596,7 @@ void setup() {
     Serial.println("normal mode, 16x oversampling for all, filter off,");
     Serial.println("0.5ms standby period");
     Serial.println("Zfilter and Kalman filter enabled!");
+    Serial.printf("BME280 Humidity calibrated to FLUKE 971 with offset: %.1f !\r\n", BME280_Hum_offset);
 
 
     delay(50);
@@ -667,15 +688,23 @@ void setup() {
   Serial.println("Setting up Wifi and MQTT now...");
   setup_wifi();
   if (wifi_ok) {
-    Serial.printf("Wifi ok! setting MQTT server: %s port 1883\r\n", mqtt_server);
+    Serial.printf("-->Now setting MQTT server: %s port 1883\r\n", mqtt_server);
   }
   client.setServer(mqtt_server, 1883);
+  delay(50);
   client.setCallback(MQTT_RX_callback);
-  client.publish("stsmd/SmartDevice_04/info", "device starts now");
-  client.publish("strtd/SmartDevice_04/online", "device will go online now");
+  delay(150);
+  //  if (!client.connected()) {
+  //       MQTT_reconnect();
+  //  }
+  //client.loop();
+  Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
+  client.publish(MQTT_Info_head, "online");
+  delay(100);
+  //client.publish("strtd/SmartDevice_04/online", "device will go online now"); //old api
   // m5mqtt.publish(str('strtd/'+Device_ID+'/online'), "Smart device is online!")
-  Serial.println("MQTT sent:strtd/SmartDevice_04/online:device online now");
-  Serial.println("Main loop running now...");
+  Serial.printf("MQTT sent: %s:online", MQTT_Info_head);
+  Serial.println("-->  ^^^ Main loop running now... ^^^");
 
 
 }
@@ -722,6 +751,7 @@ void loop() {
   if (BME280_ok) {
     tmperature = bme280.readTemperature();
     hum = bme280.readHumidity();
+    hum += BME280_Hum_offset;
     pressure = (float)bme280.readPressure() / 100.0; // in hPA
     Altitude = (float)bme280.readAltitude(SEALEVELPRESSURE_HPA) ;
     Serial.printf("BME280 Temp. = %2.2f°C ; Humidity= %0.2f %%  ;pressure= %0.2f hpa\r\n", tmperature, hum, pressure);
@@ -913,7 +943,7 @@ void loop() {
   }
 
   if (ICM20948_ok) {
-    now = millis();
+    //now = millis();
     sensors_event_t accel_event;
     sensors_event_t gyro_event;
     sensors_event_t mag_event;
@@ -951,7 +981,7 @@ void loop() {
     float heading = IMU_filter.getYaw(); //mag poles
     if (yaw_compensation_EN)
       heading = heading - yaw_offsets ;//!!!! 2019.11.18 only for PCB #1 !!!!
-    now = millis() - now;
+    //now = millis() - now;
     //Serial.print(millis());
     Serial.print("--> Orientation(Yaw,Pitch,Row): ");
     Serial.print(heading);
@@ -1001,12 +1031,25 @@ void loop() {
 
 
 
-  if (MQTT_active  ) {
-    //MQTT routine
-    if (!client.connected()) {
-      reconnect();
+  if (run_cnt % 5 == 0) {
+
+
+    if ( WiFi.status() == WL_CONNECTED) {
+      wifi_ok = true;
     }
-    client.loop();
+    else {
+      Serial.println("WiFi connection is lost!");
+      wifi_ok = false;
+      //MQTT_active = false;
+    }
+
+    if (MQTT_active && wifi_ok  ) {
+      //MQTT routine
+      if (!client.connected()) {
+        MQTT_reconnect();
+      }
+      client.loop();
+    }
   }
   //  //get motion sensor offsets
   //  if (2 == run_cnt)
@@ -1019,96 +1062,200 @@ void loop() {
   //    Serial.printf("ACC ofsets X:%6.1f mG; Y:%6.1f mG; Z:%6.1f mG\r\n", ACC_X_offset, ACC_Y_offset, ACC_Z_offset);
   //  }
 
-  if (run_cnt % 5 == 0)
-  {
-    //-------------MCP9808 bugs!------------
-    //    if (MCP9808_ok) {
-    //      MCP9808_T = MCP9808.readTemperature();
-    //      Serial.printf("MCP9808 PCB Temperature =  %.2f °C\r\n", MCP9808_T);
-    //      Serial.printf("%%%MCP9808 Temperature raw =  %d  \r\n", MCP9808.readTempRaw());
-    //      //
-    //       MCP9808.shutdown();
-    //
-    //    }
-    //-------------motion sensor test  old api------------
-    //    if ( ICM20948.dataReady() ) {
-    //      ICM20948.getAGMT();                // The values are only updated when you call 'getAGMT'
-    //      //    printRawAGMT( ICM20948.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
-    //      printScaledAGMT( ICM20948.agmt);   // This function takes into account the sclae settings from when the measurement was made to calculate the values with units
-    //      Vibration = calc_vibration(ICM20948.agmt);
-    //      Serial.printf("Device Vibration:%6.1f mG\r\n", Vibration);
-    //
-    //      //delay(30);
-    //    }
+  //  if (run_cnt % 5 == 0)
+  //  {
+  //-------------MCP9808 bugs!------------
+  //    if (MCP9808_ok) {
+  //      MCP9808_T = MCP9808.readTemperature();
+  //      Serial.printf("MCP9808 PCB Temperature =  %.2f °C\r\n", MCP9808_T);
+  //      Serial.printf("%%%MCP9808 Temperature raw =  %d  \r\n", MCP9808.readTempRaw());
+  //      //
+  //       MCP9808.shutdown();
+  //
+  //    }
+  //-------------motion sensor test  old api------------
+  //    if ( ICM20948.dataReady() ) {
+  //      ICM20948.getAGMT();                // The values are only updated when you call 'getAGMT'
+  //      //    printRawAGMT( ICM20948.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
+  //      printScaledAGMT( ICM20948.agmt);   // This function takes into account the sclae settings from when the measurement was made to calculate the values with units
+  //      Vibration = calc_vibration(ICM20948.agmt);
+  //      Serial.printf("Device Vibration:%6.1f mG\r\n", Vibration);
+  //
+  //      //delay(30);
+  //    }
 
+  //  }
+  //one time
+  if (6 == run_cnt) {
+    if (MQTT_active && wifi_ok  ) {
+
+      Serial.println("MQTT try sending online info now...\r\n");
+      client.publish("MQTT_info_head", "online");
+    }
   }
-
-
 
   if (run_cnt % 10 == 0) {
 
 
     Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
 
-    if (MQTT_active  ) {
-      Serial.printf("MQTT try sending data now...\r\n");
+    if (MQTT_active && wifi_ok  ) {
+      Serial.println("MQTT try sending data now...\r\n");
       //    char buf1[10] = "string1";
       //    char buf2[10] = "string2";
-      //
+      //    char * dtostrf( double __val, signed char __width, unsigned char __prec, char * __s)
+      //    The minimum field width of the output string (including the possible '.' and the possible sign for negative values) is given in width, and prec determines the number of digits after the decimal sign
       //    strcpy(myNewCombinedArray, buf1);
       //    strcat(myNewCombinedArray, ";");
       //    strcat(myNewCombinedArray, buf2);
+      //^^^^^^^^^^^^^^^^^^^^New server APi^^^^^^^^^^^^^^^^^^^^^
+      //Message1：Ta=32.44,To=44.32,AP=1023.34,Hum=56,AT= 100.1,LT=678.3,LB=23.56
+      //Message2：Vib=0.23,Tilt=30.1,LA=1.01,ACC_X=0.213,ACC_Y=0.233,ACC_Z=9.834
+      //Message3：CYC=3444, TAG = 9d324d5t
+      //Message4：Head=30.1, Pitch = 20.4，roll=10.1
 
 
+      //Ta
+      sprintf(MQTT_payload, "Ta=");
+      dtostrf(tmperature, 3, 2, msg);
+      strcat(MQTT_payload, msg);
+
+      //To
+      sprintf(MQTT_payload, "To=");
+      dtostrf(tmperature, 3, 2, msg);
+      strcat(MQTT_payload, msg);
+
+      //H
+      strcat(MQTT_payload, ",Hum=");
+      dtostrf(hum, 2, 2, msg);
+      strcat(MQTT_payload, msg);
+
+      //A
+      strcat(MQTT_payload, ",AP=");
+      dtostrf(pressure, 4, 2, msg);
+      strcat(MQTT_payload, msg);
+
+
+      //light top+bot
+      strcat(MQTT_payload, ",LT=");
+
+      dtostrf(lux_BH1750, 6, 1, msg);
+      strcat(MQTT_payload, msg); //light
+      strcat(MQTT_payload, ",LB=");
+      dtostrf(lux_max44009, 6, 1, msg);
+      strcat(MQTT_payload, msg); //light
+
+      Serial.printf("MQTT Msg1: %s: %s \r\n", MQTT_data_head, MQTT_payload);
+      client.publish(MQTT_data_head, MQTT_payload);
+      delay(10);
+
+      //$$$$$$$$$$$$---------Message2：Vib=0.23,Tilt=30.1,LA=1.01(G),ACC_X=0.213,ACC_Y=0.233,ACC_Z=9.834
+      memset(MQTT_payload, 0, sizeof(MQTT_payload)); //no bugs
+      //vibration
+      sprintf(MQTT_payload, "Vib=");
+      dtostrf(Vibration, 3, 2, msg);
+      strcat(MQTT_payload, msg);
+
+      //Tilt
+      strcat(MQTT_payload, ",Tilt=");
+      dtostrf(Tilt_A, 3, 2, msg);
+      strcat(MQTT_payload, msg);
+
+      //LA
+      strcat(MQTT_payload, ",LA=");
+      dtostrf(Linear_ACC, 2, 2, msg);
+      strcat(MQTT_payload, msg);
+
+      //ACC_X
+      strcat(MQTT_payload, ",ACC_X=");
+      dtostrf(ACC_X, 3, 3, msg);
+      strcat(MQTT_payload, msg);
+
+      //ACC_Y
+      strcat(MQTT_payload, ",ACC_Y=");
+      dtostrf(ACC_Y, 3, 3, msg);
+      strcat(MQTT_payload, msg);
+
+      //ACC_Z
+      strcat(MQTT_payload, ",ACC_Z=");
+      dtostrf(ACC_Z, 3, 3, msg);
+      strcat(MQTT_payload, msg);
+
+      Serial.printf("MQTT Msg2: %s: %s \r\n", MQTT_data_head, MQTT_payload);
+      client.publish(MQTT_data_head, MQTT_payload);
+      delay(10);
+
+
+      //$$$$--------------Message3：CYC=3444, TAG = 9d324d5t
+
+      memset(MQTT_payload, 0, sizeof(MQTT_payload));
+      //Cycle
+      sprintf(MQTT_payload, "CYC=%d,TAG=%s", run_cnt, String(run_cnt));
+      //sprintf(MQTT_payload, "CYC=%d,TAG=%c", run_cnt, run_cnt); //seems working
+      //      dtostrf(run_cnt, 2, 0, msg);
+      //      strcat(MQTT_payload, msg);
+
+      //TAG
+      //      strcat(MQTT_payload, ",TAG=");
+      //      dtostrf(run_cnt, 3, 0, msg);
+      //      strcat(MQTT_payload, msg);
+      Serial.printf("MQTT Msg3: %s: %s \r\n", MQTT_data_head, MQTT_payload);
+      client.publish(MQTT_data_head, MQTT_payload);
+      delay(10);
+      //^^^^^^^^^^^^^^^^^^^^new MQTT APi end^^^^^^^^^^^^^^^^^^^^^
+
+
+
+
+      //^^^^^^^^^^^^^^^^^^^^Old APi^^^^^^^^^^^^^^^^^^^^^
       // Convert the value to a char array
       //char humString[8];
       //char *dtostrf(double val, signed char width, unsigned char prec, char *s)
-      dtostrf(lux_max44009, 6, 1, msg);
-      Serial.printf("MQTT raw Msg 1:%s\r\n", msg);
-      client.publish("stsmd/SmartDevice_04/light_B", msg);
-      Serial.printf("MQTT Msg 1 sent: stsmd/SmartDevice_04/light: %.1f Lux\r\n", lux_max44009);
+      //      dtostrf(lux_max44009, 6, 1, msg);
+      //      Serial.printf("MQTT raw Msg 1:%s\r\n", msg);
+      //      client.publish("stsmd/SmartDevice_04/light_B", msg);
+      //      Serial.printf("MQTT Msg 1 sent: stsmd/SmartDevice_04/light: %.1f Lux\r\n", lux_max44009);
 
       //      dtostrf(MCP9808_T, 6, 2, msg);
       //      Serial.printf("MQTT raw Msg 2:%s\r\n", msg);
       //      client.publish("stsmd/SmartDevice_04/T_PCB", msg);
       //Serial.println(String("")+"Your Height="+height +   ", and Weight=" + weight);
       //data_payload = Data_ava_flag+str("[")+str(T)+str(",")+str(H)+str(",")+str(A)+str(",")+str(Vibration)+str(",")+str(BH_data)+str("] ")
-      sprintf(MQTT_payload, "%c", Data_ava_flag);
-      //strcpy(MQTT_payload, Data_ava_flag);
-      strcat(MQTT_payload, "[");
-      //T
-      dtostrf(tmperature, 3, 2, msg);
-      strcat(MQTT_payload, msg);
-      strcat(MQTT_payload, ",");
-      //H
-      dtostrf(hum, 2, 2, msg);
-      strcat(MQTT_payload, msg);
-      strcat(MQTT_payload, ",");
-      //A
-      dtostrf(pressure, 4, 2, msg);
-      strcat(MQTT_payload, msg);
-      strcat(MQTT_payload, ",");
+      /*
+        sprintf(MQTT_payload, "%c", Data_ava_flag);
+        //strcpy(MQTT_payload, Data_ava_flag);
+        strcat(MQTT_payload, "[");
+        //T
+        dtostrf(tmperature, 3, 2, msg);
+        strcat(MQTT_payload, msg);
+        strcat(MQTT_payload, ",");
+        //H
+        dtostrf(hum, 2, 2, msg);
+        strcat(MQTT_payload, msg);
+        strcat(MQTT_payload, ",");
+        //A
+        dtostrf(pressure, 4, 2, msg);
+        strcat(MQTT_payload, msg);
+        strcat(MQTT_payload, ",");
 
-      //vibration
-      dtostrf(Vibration, 6, 2, msg);
-      strcat(MQTT_payload, msg);
-      strcat(MQTT_payload, ",");
-      //strcat(MQTT_payload, "0,"); //dummy data for test
-      //light
-      dtostrf(lux_max44009, 6, 1, msg);
-      strcat(MQTT_payload, msg); //light
-      strcat(MQTT_payload, "]");
+        //vibration
+        dtostrf(Vibration, 6, 2, msg);
+        strcat(MQTT_payload, msg);
+        strcat(MQTT_payload, ",");
+        //strcat(MQTT_payload, "0,"); //dummy data for test
+        //light
+        dtostrf(lux_max44009, 6, 1, msg);
+        strcat(MQTT_payload, msg); //light
+        strcat(MQTT_payload, "]");
 
-      Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
-      client.publish(MQTT_SensorMsg_head, MQTT_payload);
+        Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
+        client.publish(MQTT_SensorMsg_head, MQTT_payload);
 
-      sprintf(tmp_string, "%d", run_cnt);
-      client.publish("strtd/SmartDevice_04/cycle", tmp_string);
-      //Serial.printf("MQTT Msg: %s: %s \r\n", MQTT_SensorMsg_head, MQTT_payload);
-      //combine msg data
-      //Data_ava_flag  0b1000111
-      //data_payload = Data_ava_flag+str("[")+str(T)+str(",")+str(H)+str(",")+str(A)+str(",")+str(Vibration)+str(",")+str(BH_data)+str("] ")
-      //printf.(msg);
+        sprintf(tmp_string, "%d", run_cnt);
+        client.publish("strtd/SmartDevice_04/cycle", tmp_string);
+      */
+      //^^^^^^^^^^^^^^^^^^^^Old APi^^^^^^^^^^^^^^^^^^^^^
+
       /*
           long now = millis();
           if (now - lastMsg > 2000) {
@@ -1122,16 +1269,16 @@ void loop() {
     }
   }//end run_cnt/10 MQTT
 
-  if (run_cnt % 20 == 0) {
-
-    //Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED; -1 means MQTT_DISCONNECTED)\r\n", client.state());
-
-    if (MQTT_active  ) {
-      //Serial.printf("MQTT try sending global data now...\r\n");
-      Serial.printf("&&&MQTT global Msg: %s: %s \r\n", MQTT_GlobalMsg_head, MQTT_payload);
-      client.publish(MQTT_GlobalMsg_head, MQTT_payload);
-    }
-  }//end run_cnt/20 MQTT global
+  //  if (run_cnt % 20 == 0) {
+  //
+  //    //Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED; -1 means MQTT_DISCONNECTED)\r\n", client.state());
+  //
+  //    if (MQTT_active  ) {
+  //      //Serial.printf("MQTT try sending global data now...\r\n");
+  //      Serial.printf("&&&MQTT global Msg: %s: %s \r\n", MQTT_GlobalMsg_head, MQTT_payload);
+  //      client.publish(MQTT_GlobalMsg_head, MQTT_payload);
+  //    }
+  //  }//end run_cnt/20 MQTT global
   long now = millis();
   Serial.printf("------- System run count: %d  Loop time cost: %d ms -------\r\n", run_cnt, now - lastMsg);
   Serial.println("");
@@ -1140,7 +1287,19 @@ void loop() {
   //}
   lastMsg = now;
 
+  if (run_cnt % 1000 == 0) {
+    Record_max_G();
+    //    Serial.println("Recording max linear ACC value now:");
+    //    if (Linear_ACC_max > Linear_ACC_max_last) {
+    //      Serial.println("Current Linear_ACC_max is larger than previous one, writting files now...");
+    //      dtostrf(Linear_ACC_max, 2, 2, tmp_string);
+    //      //toFloat()
+    //      //sprintf(tmp_string, "%d", run_cnt);
+    //      writeFile(FFat, "/Linear_ACC_max.txt", tmp_string);
+    //      readFile(FFat, "/Linear_ACC_max.txt");
+    //    }
 
+  }
 
 }// end loop
 
