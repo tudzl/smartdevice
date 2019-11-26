@@ -1,6 +1,8 @@
 
 /*  Smart device Main PCB code for ESP32 wrover and 6 sensors
     this code is working as APP launcher compatibale
+    TO DO TASK: 1. add NCIR, 2.MQTT wifi config, 3. ESP32-->PIC UART communication! 4. wifi lost , reconnect
+    Version 6.6 changed mqtt msg format to new api 2019.11.26
     Version 6.5 add ICM 20948 sensor function 2019.11.25
     Version 6.4 add MCP9808 sensor function contain value convertion bugs 2019.11.11
     Version 6.3 config Wifi ssid through MQTT 2019.11.11 not tested
@@ -425,7 +427,7 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
   Serial.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
   Serial.print("Message arrived on topic: ");
   Serial.println(topic);
-  Serial.println("Message content: ");
+  Serial.print("Message content: ");
   String messageTemp;
 
   for (int i = 0; i < length; i++) {
@@ -437,7 +439,7 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
   // Feel free to add more if statements to control more GPIOs with MQTT
   //-----wifi config via MQTT CMD
   if (String(topic) == mqtt_server_CMD_ssid) {//"Smartdevice_server_CMD/config_ssid"
-    Serial.printf("Changing wifi ssid to: %s", String(messageTemp));
+    Serial.printf("Changing wifi ssid to: %s \r\n", String(messageTemp));
     sprintf(ssid_new, "%s", messageTemp);
     //ssid_new = messageTemp;
   }
@@ -694,9 +696,9 @@ void setup() {
   delay(50);
   client.setCallback(MQTT_RX_callback);
   delay(150);
-  //  if (!client.connected()) {
-  //       MQTT_reconnect();
-  //  }
+    if (!client.connected()) {
+        MQTT_reconnect();
+    }
   //client.loop();
   Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
   client.publish(MQTT_Info_head, "online");
