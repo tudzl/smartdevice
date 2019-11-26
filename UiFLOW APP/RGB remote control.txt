@@ -1,0 +1,22 @@
+from m5stack import *
+from m5ui import *
+from uiflow import *
+remoteInit()
+setScreenColor(0x111111)
+
+
+
+
+x = None
+
+
+def _remote_ON_OFF(x):
+  if x == 1:
+    rgb.setColorAll(0x3333ff)
+  else:
+    rgb.setColorAll(0x000000)
+
+def _remote_Bright(x):
+  rgb.setBrightness(x)
+
+lcd.qrcode('http://flow-remote.m5stack.com/?remote=W4pI9EN1h705L5zrspacDJc6EoDUa72O', 72, 32, 176)

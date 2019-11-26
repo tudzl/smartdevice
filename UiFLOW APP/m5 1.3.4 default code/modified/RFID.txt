@@ -1,0 +1,46 @@
+#Smart device RFID test code author: ling zhou
+# version 1.00, added UOS,GC,RTC, 2019.7.5
+from m5stack import *
+from m5ui import *
+from uiflow import *
+import unit
+import  machine
+import gc
+import uos
+
+setScreenColor(0x222222)
+title = M5Title(title="     ESP32 RFID demo V1.0  2019.7", x=3 , fgcolor=0xff9900, bgcolor=0x1F1FAF)
+
+rfid0 = unit.get(unit.RFID, unit.PORTA)
+
+label0 = M5TextBox(20, 40, "NFC status:", lcd.FONT_Default,0xAFCFFF, rotate=0)
+label_data = M5TextBox(20, 60, "RFID data:", lcd.FONT_Default,0xAFCFFF, rotate=0)
+label_info = M5TextBox(20, 160, "info:", lcd.FONT_Default,0xCFBF1F, rotate=0)
+label_info_t = M5TextBox(20, 140, "info:", lcd.FONT_Default,0xCFBF1F, rotate=0)
+# display mpy info
+label_info.setText(str(uos.uname()) )
+gc.collect()
+wait(2)
+label_info.setText("Free HEAP: "+str(gc.mem_free())+" Bytes" )
+wait(2)
+#UOS api  file access
+path = "/sd"
+dirs = str (uos.listdir( path ) )
+#if dirs :
+label_info_t.setText("SD card root: ")
+print(str(dirs))
+label_info.setText(str(dirs) )
+#else
+#label_info_t.setText("Flash root: ")
+tmp_str = str ( uos.listdir() )
+#label_info.setText(tmp_str)
+#uos.listdir() # list all root files
+
+for count in range(10):
+  if rfid0.isCardOn():
+    label0.setText("NFC status: card available")
+    print(rfid0.readUid())
+    label_data.setText("Uid: " +str(rfid0.readUid()) )
+    print(rfid0.readBlockStr(1))
+
+	

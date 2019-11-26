@@ -1,0 +1,44 @@
+from m5stack import *
+from m5ui import *
+from uiflow import *
+import unit
+import random
+
+setScreenColor(0x222222)
+neopixel0 = unit.get(unit.NEOPIXEL, unit.PORTB, 24)
+
+
+
+lcd.setBrightness(25)
+Sleep_EN = 0
+LCD_EN = 10
+setScreenColor(0x111111)
+title = M5Title(title="  ESP32 neopixel debug", x=3 , fgcolor=0xff99aa, bgcolor=0x1F1F1F)
+
+
+while True:
+  
+  random1 = random.randint(0, 255)
+  random2 = random.randint(0, 255)
+  random3 = random.randint(0, 255)
+  R = random1
+  G = random2
+  B = random3
+  
+  neopixel0.setColorFrom(1, 12, 0xFF0000)
+  wait_ms(200)
+  for i in range(10, 180, 10):
+      rgb.setColorFrom(1 , 12 ,(R << 16) | (G << 8) | B)
+      neopixel0.setColorFrom(1, 12, (R << 16) | (G << 8) | B)
+      neopixel0.setColorFrom(13, 24, (G << 16) | (B << 8) | R)
+      #rgb.setColorFrom(1 , 5 ,(R << 16) | (G << 8) | B)
+      rgb.setBrightness(i)
+      wait_ms(1)
+  for i in range(180, 10, -10):
+      rgb.setColorFrom(1 , 12 ,(R << 16) | (G << 8) | B)
+      neopixel0.setColorFrom(1, 12, (R << 16) | (G << 8) | B)
+      neopixel0.setColorFrom(13, 24, (G << 16) | (B << 8) | R)
+      #rgb.setColorFrom(1 , 5 ,(R << 16) | (G << 8) | B)
+      rgb.setBrightness(i)
+      wait_ms(10)
+     #fade time step

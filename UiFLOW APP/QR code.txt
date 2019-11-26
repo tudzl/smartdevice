@@ -1,0 +1,30 @@
+from m5stack import *
+from m5ui import *
+from uiflow import *
+
+
+setScreenColor(0xA0A0A0)
+title = M5Title(title="   Smart Device ESP32 QRcode demo", x=3 , fgcolor=0xff9900, bgcolor=0x1F1F1F)
+
+remoteInit()
+setScreenColor(0x111111)
+title = M5Title(title="   Smart Device ESP32 QRcode demo", x=3 , fgcolor=0xff9900, bgcolor=0x1F1F1F)
+
+label0 = M5TextBox(20, 220, "Stäubli HZ MTC L.Zhou 2019", lcd.FONT_Default,0xAFFFFF, rotate=0)
+
+
+x = None
+
+
+def _remote_ON_OFF(x):
+  if x == 1:
+    rgb.setColorAll(0xFFF0EF)
+  else:
+    rgb.setColorAll(0x000000)
+
+def _remote_Bright(x):
+  rgb.setBrightness(x)
+
+lcd.qrcode('http://flow-remote.m5stack.com/?remote=W4pI9EN1h705L5zrspacDJc6EoDUa72O', 72, 32, 176)
+#72+176+72=320
+#lcd.qrcode('insert web url here', xposition, yposition, scale factor)
