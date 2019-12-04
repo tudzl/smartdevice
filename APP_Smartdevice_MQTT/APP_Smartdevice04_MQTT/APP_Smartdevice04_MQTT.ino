@@ -1,6 +1,10 @@
 
 /*  Smart device Main PCB code for ESP32 wrover and 6 sensors
     this code is working as APP launcher compatibale
+    TO DO TASK: 2.MQTT wifi config, 3. ESP32-->PIC UART communication! 4. wifi lost , reconnect
+    Version 6.8 RFID is working! Final version/beta version
+    Version 6.7 MLX90614 is working!
+    Version 6.6 changed mqtt msg format to new api 2019.11.26
     Version 6.5 add ICM 20948 sensor function 2019.11.25
     Version 6.4 add MCP9808 sensor function contain value convertion bugs 2019.11.11
     Version 6.3 config Wifi ssid through MQTT 2019.11.11 not tested
@@ -79,6 +83,12 @@
 #include <Mahony_DPEng.h>
 #include <Madgwick_DPEng.h>
 #include <DPEng_ICM20948_AK09916.h>
+//NCIR
+#include <Adafruit_MLX90614.h>
+//RFID
+#include "MFRC522_I2C.h"
+
+
 
 //WIFI+MQTT
 #define MQTT_KEEPALIVE 30
@@ -88,7 +98,8 @@
 //test_ESP32_smartdevice
 
 const char* device_ID = "SmartDevice_04";
-
+const char* Combitac_ID_MA = "CT34.0004-P"; //PCB
+const char* Combitac_ID_FE = "CT34.0004-S";
 
 
 
@@ -117,6 +128,9 @@ Adafruit_BME280 bme280;  // I2C  0x77
 HP20x_dev HP206;  // I2C  0x76
 //ICM20948_I2C def
 //ICM_20948_I2C ICM20948 ; //9-axis motion
+Adafruit_MLX90614 MLX90614 = Adafruit_MLX90614();
+// 0x28 is mfrc522 i2c address. Check your address with i2cscanner if not match.
+MFRC522 mfrc522(0x28);   // Create MFRC522 instance.
 
 POWER m5_power;
 //global vars
@@ -126,6 +140,8 @@ float pressure = 0;
 float hum = 0;
 const float BME280_Hum_offset = 17.8 ; // calibration with Fluke 971, 2019.11.26 for #4 PCB
 float tmperature = 0;
+float T_MLX_obj = 0; //NCIR T
+float T_MLX_self = 0;
 float T_bmp = 0;
 float Alt_bmp = 0;
 double Altitude = 0; // in meter @ 25 degree
@@ -140,8 +156,9 @@ bool HP206_ok = false;
 bool MCP9808_ok = false;
 bool MCP9808_ENA = false; // enable or disable MCP9808 sensor
 bool ICM20948_ok = false;
-
-
+bool MLX90614_ok = false;
+bool mfrc522_ok = false;
+char TAG_NFC [9]; // 8 bytes for TAG UID
 
 //--------------IMU----------------
 const float Gravity_HZ = 9.7936 ;
@@ -255,6 +272,8 @@ const char* ssid2 = "WH10";
 const char* password2 = "Zell9090";
 const char* ssid3 = "HUAWEI-XM"; //test only
 const char* password3 = "Zell9090";
+const char* ssid4 = "Staubli_SD"; //for ASWIL test only
+const char* password5 = "smartdevice";
 char ssid_new [12];
 char password_new [12];
 unsigned char wifi_config = 2 ;
@@ -264,14 +283,14 @@ const char* mqtt_server = "st.devmolv.com";
 const char* mqtt_server_CMD_topic = "Smartdevice_server_CMD/+";
 const char* mqtt_server_CMD_ssid = "Smartdevice_server_CMD/config_ssid";
 const char* mqtt_server_CMD_passwor = "Smartdevice_server_CMD/config_password";
-const char* mqtt_server_CMD_status= "Smartdevice_server_CMD/status";
+const char* mqtt_server_CMD_status = "Smartdevice_server_CMD/status";
 
 //Strings are actually one-dimensional array of characters terminated by a null character '\0'.
 
-const char* MQTT_Info_head =  "stsmd/SmartDevice_04/info"; //for new server api
-const char* MQTT_data_head =  "stsmd/SmartDevice_04/data";
-const char* MQTT_SensorMsg_head = "stsmd/SmartDevice_04/local"; //for old api
-const char* MQTT_GlobalMsg_head = "stsmd/SmartDevice_04/global"; //for old api
+const char* MQTT_Info_head =  "stsmd/CT34.0004-P/info"; //for new server api
+const char* MQTT_data_head =  "stsmd/CT34.0004-P/data";
+const char* MQTT_SensorMsg_head = "stsmd/CT34.0004-P/local"; //for old api
+const char* MQTT_GlobalMsg_head = "stsmd/CT34.0004-P/global"; //for old api
 char MQTT_payload[128] ;
 const char  Data_ava_flag = B1001111 ; //ori 1000111
 
@@ -279,7 +298,7 @@ WiFiClient SmartDevice_04;
 PubSubClient client(SmartDevice_04);
 
 long lastMsg = 0;
-char msg[64];
+char msg[32];
 char tmp_string[32];
 //int value = 0;
 long now = 0;
@@ -425,7 +444,7 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
   Serial.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
   Serial.print("Message arrived on topic: ");
   Serial.println(topic);
-  Serial.println("Message content: ");
+  Serial.print("Message content: ");
   String messageTemp;
 
   for (int i = 0; i < length; i++) {
@@ -437,7 +456,7 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
   // Feel free to add more if statements to control more GPIOs with MQTT
   //-----wifi config via MQTT CMD
   if (String(topic) == mqtt_server_CMD_ssid) {//"Smartdevice_server_CMD/config_ssid"
-    Serial.printf("Changing wifi ssid to: %s", String(messageTemp));
+    Serial.printf("Changing wifi ssid to: %s \r\n", String(messageTemp));
     sprintf(ssid_new, "%s", messageTemp);
     //ssid_new = messageTemp;
   }
@@ -470,8 +489,12 @@ void MQTT_RX_callback(char* topic, byte* message, unsigned int length) {
 //MQTT server reconnect,In the  MQTT_reconnect() function, you can subscribe to MQTT topics. In this case, the ESP32 is only subscribed to the test_ESP32_smartdevice_server:
 void MQTT_reconnect() {
   // Loop until we're reconnected
+  unsigned int cnt = 0 ;
   while (!client.connected()) {
     Serial.print("-->:Attempting MQTT connection...");
+
+    if ( cnt > 4)
+      break;
     // Attempt to connect
     if (client.connect(device_ID)) {
       Serial.println("connected");
@@ -485,6 +508,7 @@ void MQTT_reconnect() {
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
+      cnt++;
     }
   }
 }
@@ -513,6 +537,7 @@ void setup() {
   Serial.println(F("<<<Smart device V2 sensor MQTT test>>>"));
   Serial.println(F("<<<Firmware Version 6.4, ling zhou, 11.11.2019>>>"));
   Serial.printf("<<<----Device ID: %s----->>>\r\n", device_ID);
+  delay(50);
   if (Top_LightSensor.begin2(Bh1750_add))
   {
     dev_cnt++;
@@ -520,6 +545,19 @@ void setup() {
     Serial.println("* Top light sensor BH1750 is connected!");
     delay(50);
     Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+  }
+
+  if (MLX90614.begin2()) {
+    //MLX90614 chip ID readout: 0  bugs?
+
+    MLX90614_ok = true;
+    dev_cnt++;
+    //Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+    Serial.println("* NCIR MLX90614 sensor is connected!");
+    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+  }
+  else {
+    Serial.println("## NCIR sensor is not connected!");
   }
 
 
@@ -678,7 +716,18 @@ void setup() {
   //  }
   //  ICM20948_config();
 
-
+  //*******************RFID*********************
+  if (mfrc522.PCD_Init2() ) {
+    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+    Serial.println( "* RFID Reader module mfrc522 is initialized!" );
+    mfrc522_ok = true;
+    dev_cnt++;
+    ShowMFRC522Details();
+  }
+  else {
+    Serial.println( "* RFID Reader module is not connected!" );
+    mfrc522_ok = false;
+  }
 
 
   Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
@@ -694,9 +743,11 @@ void setup() {
   delay(50);
   client.setCallback(MQTT_RX_callback);
   delay(150);
-  //  if (!client.connected()) {
-  //       MQTT_reconnect();
-  //  }
+  if (wifi_ok) {
+    if (!client.connected()) {
+      MQTT_reconnect();
+    }
+  }
   //client.loop();
   Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
   client.publish(MQTT_Info_head, "online");
@@ -942,6 +993,20 @@ void loop() {
 
   }
 
+  //-------------NCIR test!------------
+  if (MLX90614_ok) {
+
+    T_MLX_obj = MLX90614.readObjectTempC();
+    Serial.printf("--> MLX90614 Obj Temperature =  %.2f °C\r\n", T_MLX_obj);
+    T_MLX_self = MLX90614.readAmbientTempC();
+    Serial.printf("--> MLX90614 self Temperature =  %.2f °C\r\n", T_MLX_self);
+
+
+  }
+
+
+
+
   if (ICM20948_ok) {
     //now = millis();
     sensors_event_t accel_event;
@@ -1096,7 +1161,7 @@ void loop() {
 
   if (run_cnt % 10 == 0) {
 
-
+    RFID_READ_TAG();
     Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
 
     if (MQTT_active && wifi_ok  ) {
@@ -1113,17 +1178,23 @@ void loop() {
       //Message2：Vib=0.23,Tilt=30.1,LA=1.01,ACC_X=0.213,ACC_Y=0.233,ACC_Z=9.834
       //Message3：CYC=3444, TAG = 9d324d5t
       //Message4：Head=30.1, Pitch = 20.4，roll=10.1
-
-
-      //Ta
-      sprintf(MQTT_payload, "Ta=");
+      //unsigned int len = 0;
+      memset(MQTT_payload, 0, sizeof(MQTT_payload)); //no bugs
+      //Ta not stored in MQTT_payload? bug fixed!
       dtostrf(tmperature, 3, 2, msg);
+      sprintf(MQTT_payload, "Ta="); //end with null?
+      strcat(MQTT_payload, msg);
+      //len=sprintf(MQTT_payload, "Ta="); //end with null?
+      //MQTT_payload[len] = '';
+      
+
+
+
+      //T obj  NCIR
+      strcat(MQTT_payload, ",To=");
+      dtostrf(T_MLX_obj, 3, 2, msg);
       strcat(MQTT_payload, msg);
 
-      //To
-      sprintf(MQTT_payload, "To=");
-      dtostrf(tmperature, 3, 2, msg);
-      strcat(MQTT_payload, msg);
 
       //H
       strcat(MQTT_payload, ",Hum=");
@@ -1189,8 +1260,10 @@ void loop() {
       //$$$$--------------Message3：CYC=3444, TAG = 9d324d5t
 
       memset(MQTT_payload, 0, sizeof(MQTT_payload));
-      //Cycle
-      sprintf(MQTT_payload, "CYC=%d,TAG=%s", run_cnt, String(run_cnt));
+      //Cycle,Combitac_ID_FE
+      sprintf(MQTT_payload, "CYC=%d,TAG=%s", run_cnt, String(TAG_NFC) );  // for real tag test 2019.12.2 TAG_NFC[i]
+      //sprintf(MQTT_payload, "CYC=%d,TAG=%s", run_cnt, Combitac_ID_FE);  // for sim test 2019.12.2
+      //sprintf(MQTT_payload, "CYC=%d,TAG=%s", run_cnt, String(run_cnt)); //test only
       //sprintf(MQTT_payload, "CYC=%d,TAG=%c", run_cnt, run_cnt); //seems working
       //      dtostrf(run_cnt, 2, 0, msg);
       //      strcat(MQTT_payload, msg);
@@ -1213,12 +1286,12 @@ void loop() {
       //char *dtostrf(double val, signed char width, unsigned char prec, char *s)
       //      dtostrf(lux_max44009, 6, 1, msg);
       //      Serial.printf("MQTT raw Msg 1:%s\r\n", msg);
-      //      client.publish("stsmd/SmartDevice_04/light_B", msg);
-      //      Serial.printf("MQTT Msg 1 sent: stsmd/SmartDevice_04/light: %.1f Lux\r\n", lux_max44009);
+      //      client.publish("stsmd/CT34.0004-P/light_B", msg);
+      //      Serial.printf("MQTT Msg 1 sent: stsmd/CT34.0004-P/light: %.1f Lux\r\n", lux_max44009);
 
       //      dtostrf(MCP9808_T, 6, 2, msg);
       //      Serial.printf("MQTT raw Msg 2:%s\r\n", msg);
-      //      client.publish("stsmd/SmartDevice_04/T_PCB", msg);
+      //      client.publish("stsmd/CT34.0004-P/T_PCB", msg);
       //Serial.println(String("")+"Your Height="+height +   ", and Weight=" + weight);
       //data_payload = Data_ava_flag+str("[")+str(T)+str(",")+str(H)+str(",")+str(A)+str(",")+str(Vibration)+str(",")+str(BH_data)+str("] ")
       /*
@@ -1307,6 +1380,31 @@ void loop() {
 //^^^^^^^^^^^^^^^^^^^^^%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //^^^^^^^^^^^^^^^^^^^^^%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //^^^^^^^^^^^^^^^^^^^^^%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+//^^^^^^^^^^^^^^^^^^^^^ RFID API ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+void RFID_READ_TAG (void) {
+
+  // Look for new cards, and select one if present
+  if ( ! mfrc522.PICC_IsNewCardPresent() || ! mfrc522.PICC_ReadCardSerial() ) {
+    delay(50);
+    return;
+  }
+
+  // Now a card is selected. The UID and SAK is in mfrc522.uid.
+  Serial.print("--> RFID TAG is present with UID: ");
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
+    Serial.print(mfrc522.uid.uidByte[i], HEX);
+   
+    //TAG_NFC[i]=mfrc522.uid.uidByte[i]; //for test, cause "CYC=90,TAG=\��"
+    
+  }
+   sprintf(TAG_NFC,"%2X%2X%2X%2X",mfrc522.uid.uidByte[0],mfrc522.uid.uidByte[1],mfrc522.uid.uidByte[2],mfrc522.uid.uidByte[3]);
+   //sprintf(TAG_NFC[2*i+1],"%1X",0x0F&(mfrc522.uid.uidByte[i]) );
+  Serial.println();
+}
 
 
 
@@ -1740,6 +1838,36 @@ void Record_max_G(void) {
     readFile(FFat, "/Linear_ACC_max.txt");
   }
 }
+
+
+
+//-----RFID MFRC522-----------------
+void ShowMFRC522Details() {
+  // Get the MFRC522 software version
+  byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+  Serial.print(F("MFRC522 Software Version: 0x"));
+  Serial.print(v, HEX);
+  if (v == 0x91)
+    Serial.print(F(" = v1.0"));
+  else if (v == 0x92)
+    Serial.print(F(" = v2.0"));
+  else
+    Serial.print(F(" (unknown)"));
+  Serial.println("");
+  // When 0x00 or 0xFF is returned, communication probably failed
+  if ((v == 0x00) || (v == 0xFF)) {
+    Serial.println(F("WARNING: Communication failure, is the MFRC522 properly connected?"));
+  }
+}
+
+
+
+
+
+
+
+
+
 
 void readFile(fs::FS &fs, const char * path) {
 
