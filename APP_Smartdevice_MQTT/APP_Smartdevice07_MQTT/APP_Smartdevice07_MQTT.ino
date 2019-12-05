@@ -1,7 +1,7 @@
 
 /*  Smart device Main PCB code for ESP32 wrover and 6 sensors
     this code is working as APP launcher compatibale
-    TO DO TASK: 2.MQTT wifi config, 3. ESP32-->PIC UART communication! 4. wifi lost , reconnect
+    TO DO TASK: 1. go offline msg exchange between pic and esp32; 2.MQTT wifi config, 3. ESP32-->PIC UART communication! 4. wifi lost , reconnect
     Version 6.9 RFID reset bug fixed! Final version/beta version
     Version 6.8 RFID is working! Final version/beta version
     Version 6.7 MLX90614 is working!
@@ -95,14 +95,14 @@
 #define MQTT_KEEPALIVE 30
 #include <WiFi.h>
 #include <PubSubClient.h>  //MQTT
-//mqtt.subscribe(str('stsmd/'+Device_ID+'/alert')
-//test_ESP32_smartdevice
+//mqtt.subscribe(str('stsmd/'+Device_ID+'/info')
 
-const char* device_ID = "SmartDevice_05";
-const char* Combitac_ID_MA = "CT34.0005-P"; //PCB
-const char* Combitac_ID_FE = "CT34.0005-S";
 
-const float BME280_Hum_offset = 11.2 ; // calibration with Fluke 971, 2019.12.4 for #5 PCB
+const char* device_ID = "SmartDevice_07";
+const char* Combitac_ID_MA = "CT34.0007-P"; //PCB
+const char* Combitac_ID_FE = "CT34.0007-S";
+
+const float BME280_Hum_offset = 10.2 ; // calibration with Fluke 971, 2019.12.4 for #5 PCB
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 //bmp280 address:  0x76
@@ -289,15 +289,15 @@ const char* mqtt_server_CMD_status = "Smartdevice_server_CMD/status";
 
 //Strings are actually one-dimensional array of characters terminated by a null character '\0'.
 
-const char* MQTT_Info_head =  "stsmd/CT34.0005-P/info"; //for new server api
-const char* MQTT_data_head =  "stsmd/CT34.0005-P/data";
-const char* MQTT_SensorMsg_head = "stsmd/CT34.0005-P/local"; //for old api
-const char* MQTT_GlobalMsg_head = "stsmd/CT34.0005-P/global"; //for old api
+const char* MQTT_Info_head =  "stsmd/CT34.0007-P/info"; //for new server api
+const char* MQTT_data_head =  "stsmd/CT34.0007-P/data";
+const char* MQTT_SensorMsg_head = "stsmd/CT34.0007-P/local"; //for old api
+const char* MQTT_GlobalMsg_head = "stsmd/CT34.0007-P/global"; //for old api
 char MQTT_payload[128] ;
 const char  Data_ava_flag = B1001111 ; //ori 1000111
 
-WiFiClient SmartDevice_05;
-PubSubClient client(SmartDevice_05); //using name from above wificlient
+WiFiClient SmartDevice_07;
+PubSubClient client(SmartDevice_07); //using name from above wificlient
 
 long lastMsg = 0;
 char msg[32];
@@ -340,45 +340,18 @@ void buttonA_longPressed(void) {
     Serial.printf("-->:Smart device MQTT turn OFF now...\r\n");
     client.publish(MQTT_Info_head, "offline");
     delay(50);
-    client.publish("strtd/CT34.0005-P/online", "");
+    client.publish("stsmd/CT34.0007-P/online", ""); //old strtd
   }
   else {
     Serial.printf("-->:Smart device MQTT go Online now!\r\n");
     client.publish(MQTT_Info_head, "online");
     delay(50);
-    client.publish("strtd/CT34.0005-P/online", "now online!");
+    client.publish("stsmd/CT34.0007-P/online", "now online!");//old strtd
   }
+
   Serial.println("");
 }
 
-//void buttonB_wasPressed(void) {
-//  //M5.Speaker.beep();  // too laud
-//  //M5.Speaker.tone(800, 20);
-//  if (HP206_ok)
-//    height_base = A_Kfilter;
-//  else if (bme680_ok)
-//    height_base = Altitude;
-//}
-////set the altitude offset to current altitude
-//void buttonB_longPressed(void) {
-//  //M5.Speaker.beep();  // too laud
-//  //M5.Speaker.tone(800, 20);
-//  Altitude_offset = Altitude;
-//
-//}
-//
-//void buttonC_wasPressed(void) {
-//  //M5.Speaker.beep();  // too laud
-//  //M5.Speaker.tone(800, 20);
-//
-//
-//  if (HP206_ok)
-//    height_new = A_Kfilter;
-//  else if (bme680_ok)
-//    height_new = Alt_bmp;
-//  height_diff = height_new - height_base;
-//
-//}
 
 
 
@@ -395,6 +368,18 @@ void setup_wifi() {
     WiFi.begin(ssid, password);
   }
   else if (2 == wifi_config)
+  { Serial.println(ssid2);
+    WiFi.begin(ssid2, password2);
+  }
+  else if (3 == wifi_config)
+  { Serial.println(ssid3);
+    WiFi.begin(ssid3, password3);
+  }
+  else if (4 == wifi_config)
+  { Serial.println(ssid4);
+    WiFi.begin(ssid4, password4);
+  }
+  else
   { Serial.println(ssid2);
     WiFi.begin(ssid2, password2);
   }
@@ -756,7 +741,7 @@ void setup() {
   Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
   client.publish(MQTT_Info_head, "online");
   delay(100);
-  //client.publish("strtd/CT34.0005-P/online", "device will go online now"); //old api
+  //client.publish("strtd/CT34.0007-P/online", "device will go online now"); //old api
   // m5mqtt.publish(str('strtd/'+Device_ID+'/online'), "Smart device is online!")
   Serial.printf("MQTT sent: %s:online", MQTT_Info_head);
   Serial.println("-->  ^^^ Main loop running now... ^^^");
@@ -1290,12 +1275,12 @@ void loop() {
       //char *dtostrf(double val, signed char width, unsigned char prec, char *s)
       //      dtostrf(lux_max44009, 6, 1, msg);
       //      Serial.printf("MQTT raw Msg 1:%s\r\n", msg);
-      //      client.publish("stsmd/CT34.0005-P/light_B", msg);
-      //      Serial.printf("MQTT Msg 1 sent: stsmd/CT34.0005-P/light: %.1f Lux\r\n", lux_max44009);
+      //      client.publish("stsmd/CT34.0007-P/light_B", msg);
+      //      Serial.printf("MQTT Msg 1 sent: stsmd/CT34.0007-P/light: %.1f Lux\r\n", lux_max44009);
 
       //      dtostrf(MCP9808_T, 6, 2, msg);
       //      Serial.printf("MQTT raw Msg 2:%s\r\n", msg);
-      //      client.publish("stsmd/CT34.0005-P/T_PCB", msg);
+      //      client.publish("stsmd/CT34.0007-P/T_PCB", msg);
       //Serial.println(String("")+"Your Height="+height +   ", and Weight=" + weight);
       //data_payload = Data_ava_flag+str("[")+str(T)+str(",")+str(H)+str(",")+str(A)+str(",")+str(Vibration)+str(",")+str(BH_data)+str("] ")
       /*
@@ -1329,7 +1314,7 @@ void loop() {
         client.publish(MQTT_SensorMsg_head, MQTT_payload);
 
         sprintf(tmp_string, "%d", run_cnt);
-        client.publish("strtd/CT34.0005-P/cycle", tmp_string);
+        client.publish("strtd/CT34.0007-P/cycle", tmp_string);
       */
       //^^^^^^^^^^^^^^^^^^^^Old APi^^^^^^^^^^^^^^^^^^^^^
 
