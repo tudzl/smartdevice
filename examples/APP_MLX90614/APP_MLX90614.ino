@@ -1,6 +1,6 @@
 
-/* this code is working as APP launcher compatib
- *  Version 6.0  Add MLX90614 ,  
+/* this code is working as APP launcher compatible
+    Version 6.0  Add MLX90614 smartdevice sensor ,  working with m5stack， 2019.12.10
     Version 5.0  Add altitude base , offset diff measure function
     Version 4.0  HP206C bug fixed!  altitude: ulong changed to long
     Version 3.1  Zfilter and kalman filter works!
@@ -56,6 +56,9 @@ double Altitude = 0; // in meter @ 25 degree
 double Altitude_offset = 0;   // in meter
 float T_MLX_obj = 0; //NCIR T
 float T_MLX_self = 0;
+
+float T_max, T_min = 0; // for object
+float TA_max, TA_min = 0; // for ambient
 
 //status vars
 bool dht12_ok = false;
@@ -159,7 +162,7 @@ void setup() {
     ESP.restart();
   }
 
-   Serial.println(F("<<<M5stack Smart sensor test>>>"));
+  Serial.println(F("<<<M5stack Smart sensor test>>>"));
   Serial.println(F("<<<Firmware Version 6.0, ling zhou, 12.12.2019>>>"));
 
   m5_power.begin();
@@ -231,15 +234,25 @@ void setup() {
 
     Serial.println("* Melexis Infra Red Thermometer MLX90614 sensor is connected!");
     Serial.println("-40°C…+125˚C for sensor temperature ");
+    M5.Lcd.setTextColor(GREEN, BLACK);
     M5.Lcd.println("-40°C…+125˚C for sensor temperature ");
+    delay(400);
     Serial.println("-70°C…+380˚C for object temperature ");
     M5.Lcd.println("-70°C…+380˚C for object temperature ");
+    delay(400);
     float Emissivity = MLX90614.readEmissivity();
     Serial.printf("Default Emissivity =  %.2f \r\n", Emissivity);
     M5.Lcd.printf("Default Emissivity =  %.2f \r\n", Emissivity);
 
     Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
     delay(600);
+
+    T_max =   MLX90614.readObjectTempC();
+    T_min = T_max;
+    TA_max =   MLX90614.readAmbientTempC();
+    TA_min = TA_max;
+
+
   }
   else {
     while (!bmp280.begin(0x76)) {
@@ -304,7 +317,13 @@ void loop() {
     Serial.printf("--> MLX90614 Obj Temperature =  %.2f °C\r\n", T_MLX_obj);
     T_MLX_self = MLX90614.readAmbientTempC();
     Serial.printf("--> MLX90614 self Temperature =  %.2f °C\r\n", T_MLX_self);
-
+    //calc max ,min
+    T_max = max(T_max, T_MLX_obj);
+    T_min = min(T_min, T_MLX_obj);
+    TA_max = max(TA_max, T_MLX_self);
+    TA_min = min(TA_min, T_MLX_self);
+    Serial.printf("--: MLX90614 Max and min object Temperature =  %.2f °C, %.2f °C\r\n", T_max, T_min);
+    Serial.printf("--: MLX90614 Max and min Ambient Temperature =  %.2f °C, %.2f °C\r\n", TA_max, TA_min);
   }
 
   //-----------HP206 ----------------
@@ -387,7 +406,10 @@ void loop() {
     M5.Lcd.println("");
     M5.Lcd.setTextColor(LIGHTGREY, BLACK);
     //T_MLX_self ;
-    M5.Lcd.printf("Ambient T:  %.2f C\r\n", T_MLX_self);
+    M5.Lcd.printf("Ambient T: %.2f C\r\n", T_MLX_self);
+
+    M5.Lcd.printf("Max and min object T:\r\n  %.2f °C,  %.2f °C\r\n", T_max, T_min);
+    M5.Lcd.printf("Max and min Ambient T:\r\n  %.2f °C,  %.2f °C\r\n", TA_max, TA_min);
     delay(200);
   }
 
@@ -417,7 +439,7 @@ void loop() {
   if  (HP206_ok)
   {
     //M5.Lcd.setTextSize(3);
-    M5.Lcd.printf("Temp: %2.2f C\r\nPress:%0.2fhPa\r\nAltitude:%.2f M \r\n", tmperature,  pressure , Altitude);
+    M5.Lcd.printf("Temp: %2.2f C\r\nPress:%0.2fhPa\r\nAltitude:%.2f M\r\n", tmperature,  pressure , Altitude);
 
     M5.Lcd.setTextColor(GREEN, BLACK);
     M5.Lcd.setTextSize(2); //size 2 to 8
@@ -442,11 +464,11 @@ void loop() {
     M5.Lcd.setTextColor(BLUE, BLACK);
     M5.Lcd.printf("Gas: %0.1d Kohms\r\n", Gas / 1000);
     //height meter display
-  M5.Lcd.setTextSize(2); //size 2 to 8
-  M5.Lcd.setTextColor(LIGHTGREY, BLACK);
-  M5.Lcd.printf("Base:%0.1f M; Cur:%0.1f M; Dif:%0.1f M \r\n", height_base, height_new, height_diff);
+    M5.Lcd.setTextSize(2); //size 2 to 8
+    M5.Lcd.setTextColor(LIGHTGREY, BLACK);
+    M5.Lcd.printf("Base:%0.1f M; Cur:%0.1f M; Dif:%0.1f M \r\n", height_base, height_new, height_diff);
   }
-  
+
 
 
 
