@@ -1,8 +1,8 @@
 
 /*  Smart device Main PCB code for ESP32 wrover and 6 sensors
     this code is working as APP launcher compatibale
-    TO DO TASK: 2.MQTT wifi config,To add WiFiMQTTManager.h 3. ESP32-->PIC UART communication! 
-    Version 7.0 added 4. wifi lost , reconnect seems ok! 
+    TO DO TASK: 2.MQTT wifi config,To add WiFiMQTTManager.h 3. ESP32-->PIC UART communication!
+    Version 7.0 added 4. wifi lost , reconnect seems ok!
     Version 6.9 RFID reset bug fixed! Final version/beta version
     Version 6.8 RFID is working! Final version/beta version
     Version 6.7 MLX90614 is working!
@@ -80,6 +80,7 @@
 #include <ZFilter.h>
 #include <MAX44009.h>  //Wide 0.045 Lux to 188,000 Lux Range
 #include "Adafruit_MCP9808.h"
+#include "Protocentral_MAX30205.h" //body T sensor
 //For #include "filename" the preprocessor searches first in the same directory as the file containing the directive, and then follows the search path used for the #include <filename> form. This method is normally used to include programmer-defined header files.
 //#include "ICM_20948.h"  // old api ;  Click here to get the library: http://librarymanager/All#SparkFun_ICM20948_IMU
 #include <Mahony_DPEng.h>
@@ -96,7 +97,7 @@
 #define MQTT_KEEPALIVE 30
 #include <WiFi.h>
 #include <PubSubClient.h>  //MQTT
-//#include <WiFiMQTTManager.h> //wifi config save
+#include <WiFiMQTTManager.h> //wifi config save, need ArduinoJson , WiFiManager
 //mqtt.subscribe(str('stsmd/'+Device_ID+'/alert')
 //test_ESP32_smartdevice
 
@@ -129,6 +130,7 @@ Adafruit_BME680 bme680; // I2C  0x76
 Adafruit_BMP280 bmp280;  // I2C  0x76
 Adafruit_BME280 bme280;  // I2C  0x77
 HP20x_dev HP206;  // I2C  0x76
+MAX30205 MAX30205_sensor;
 //ICM20948_I2C def
 //ICM_20948_I2C ICM20948 ; //9-axis motion
 Adafruit_MLX90614 MLX90614 = Adafruit_MLX90614();
@@ -147,6 +149,7 @@ float T_MLX_obj = 0; //NCIR T
 float T_MLX_self = 0;
 float T_bmp = 0;
 float Alt_bmp = 0;
+double T_max30205 = 0;
 double Altitude = 0; // in meter @ 25 degree
 double Altitude_offset = 0;   // in meter
 bool top_light_ok = false;  //BH
@@ -161,6 +164,7 @@ bool MCP9808_ENA = false; // enable or disable MCP9808 sensor
 bool ICM20948_ok = false;
 bool MLX90614_ok = false;
 bool mfrc522_ok = false;
+bool MAX30205_ok = false;
 char TAG_NFC [9]; // 8 bytes for TAG UID
 
 //--------------IMU----------------
@@ -307,6 +311,11 @@ char tmp_string[32];
 //int value = 0;
 long now = 0;
 
+//Timer1 for wifi check
+long TMR1_start = 0;
+long TMR1_stop = 0;
+long TMR1_interval = 10;  //10s
+
 
 //short press Btn to reset IMU offsets
 void buttonA_wasPressed(void) {
@@ -328,6 +337,32 @@ void buttonA_wasPressed(void) {
 
 }
 
+
+//long press Btn to Disconnect wifi
+void buttonA_longPressed2(void) {
+  //M5.Speaker.beep();  // too laud
+  Serial.println("");
+  Serial.println(" --^^^--- buttonA/S1 is longPressed over 0.75s !!!");
+  Serial.println("");
+  Serial.println(" --^^^--- Disconnect wifi now to save power !!!");
+  WiFi.disconnect(true);
+  Serial.println(WiFi.localIP());
+  delay(500);
+}
+
+//long press Btn to connect wifi
+void buttonA_longPressed3(void) {
+  //M5.Speaker.beep();  // too laud
+  Serial.println("");
+  Serial.println(" --^^^--- buttonA/S1 is longPressed over 1.25s !!!");
+  Serial.println("");
+  Serial.println(" --^^^--- connect wifi now  !!!");
+  WiFi.disconnect(false);
+  setup_wifi();
+  delay(50);
+  Serial.println(WiFi.localIP());
+  delay(500);
+}
 //long press Btn to send online info
 void buttonA_longPressed(void) {
   //M5.Speaker.beep();  // too laud
@@ -404,11 +439,11 @@ void setup_wifi() {
   { Serial.println(ssid3);
     WiFi.begin(ssid3, password3);
   }
-   else if (4 == wifi_config)
+  else if (4 == wifi_config)
   { Serial.println(ssid4);
     WiFi.begin(ssid4, password4);
   }
-    else 
+  else
   { Serial.println(ssid2);
     WiFi.begin(ssid2, password2);
   }
@@ -748,6 +783,20 @@ void setup() {
   }
 
 
+  if (MAX30205_sensor.begin2())
+  {
+    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+    dev_cnt++;
+    MAX30205_ok = true;
+    Serial.println("* MAX30205 high precision body temperature sensor is connected!");
+    Serial.println("* 16-Bit (0.00390625°C) Temperature Resolution!");
+    Serial.println("* 0.1°C Accuracy (37°C to 39°C)!");
+    delay(50);
+    
+  }
+  else  Serial.println("Couldn't find body temperature sensor Max30205! Check your PCB module connections and verify the IIC address 0x49 is correct.");
+
+
   Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
 
   //----------sensor all init. above----------------
@@ -798,6 +847,14 @@ void loop() {
     lux_max44009 = MAX44009_light.get_lux();
     Serial.printf("Bot light =  %.1f Lux\r\n", lux_max44009 );
   }
+
+  if (MAX30205_ok) {
+    T_max30205 = MAX30205_sensor.getTemperature();
+    Serial.printf("-->: MAX30205 body T =  %.3f °C\r\n", T_max30205 );
+  }
+
+
+
 
   //  if (Gas_EN == 0) {
   //    //disable gas heater
@@ -1105,6 +1162,17 @@ void loop() {
   }
 
 
+  if (M5.BtnA.pressedFor(750) ) {
+    buttonA_longPressed2();
+    Serial.printf("!!--!! BtnA was long Pressed over 750ms \r\n");
+  }
+
+  if (M5.BtnA.pressedFor(1250) ) {
+    buttonA_longPressed3();
+    Serial.printf("!!--!! BtnA was long Pressed over 1250ms \r\n");
+  }
+
+
   if (Wrover_module)
     delay(time_interval); // total 500ms loop
   //MCP9808.wakeup();   // wake up, delay 250ms; ready to read!
@@ -1112,10 +1180,10 @@ void loop() {
   //delay(100); //100ms
 
 
-
-
-  if (run_cnt % 5 == 0) {
-
+  //---------timer 1 check and call back-----------
+  TMR1_stop = millis();
+  float Zeit = (TMR1_stop - TMR1_start) / 1000.0; //to seconds
+  if (Zeit >= TMR1_interval) {
 
     if ( WiFi.status() == WL_CONNECTED) {
       wifi_ok = true;
@@ -1125,8 +1193,18 @@ void loop() {
       wifi_ok = false;
       //MQTT_active = false;
       WiFi.reconnect();
-       setup_wifi(); //reconnect wifi
+      setup_wifi(); //reconnect wifi
     }
+    //reset timer1
+    TMR1_start = millis();
+    Zeit = 0;
+  }
+
+
+  if (run_cnt % 10 == 0) {
+
+
+
 
     if (MQTT_active && wifi_ok  ) {
       //MQTT routine
