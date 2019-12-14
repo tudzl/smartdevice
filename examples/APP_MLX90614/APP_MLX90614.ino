@@ -1,5 +1,6 @@
 
 /* this code is working as APP launcher compatible
+ *  Version 6.1  improve MLX90614 smartdevice sensor ,  working with m5stack， 2019.12.14
     Version 6.0  Add MLX90614 smartdevice sensor ,  working with m5stack， 2019.12.10
     Version 5.0  Add altitude base , offset diff measure function
     Version 4.0  HP206C bug fixed!  altitude: ulong changed to long
@@ -168,7 +169,8 @@ void setup() {
   m5_power.begin();
   //POWER::ShutdownTime SHDT; // SHDT is declared as the enum
   //SHDT = POWER::ShutdownTimeSHUTDOWN_64S;
-  m5_power.setLightLoadShutdownTime(); //SHUTDOWN_64S
+  m5_power.setLowPowerShutdownTime(POWER::ShutdownTime::SHUTDOWN_32S);
+  //m5_power.setLightLoadShutdownTime(); //SHUTDOWN_64S
   //m5_power.setLowPowerShutdownTime(POWER::ShutdownTime::SHUTDOWN_64S);
   m5_power.setPowerBoostSet(true); //短按开关boost, 1:enable
   m5_power.setPowerVin(true);//VIN拔出后，是否开启 Boost
@@ -406,10 +408,12 @@ void loop() {
     M5.Lcd.println("");
     M5.Lcd.setTextColor(LIGHTGREY, BLACK);
     //T_MLX_self ;
-    M5.Lcd.printf("Ambient T: %.2f C\r\n", T_MLX_self);
-
-    M5.Lcd.printf("Max and min object T:\r\n  %.2f °C,  %.2f °C\r\n", T_max, T_min);
-    M5.Lcd.printf("Max and min Ambient T:\r\n  %.2f °C,  %.2f °C\r\n", TA_max, TA_min);
+    M5.Lcd.printf("AmbientT: %.2f C\r\n", T_MLX_self);
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.setTextColor(WHITE, BLACK);
+    M5.Lcd.printf("Max & Min object:\r\n %.2f C,  %.2f °C\r\n", T_max, T_min);
+    M5.Lcd.setTextColor(BLUE, BLACK);
+    M5.Lcd.printf("Max & Min Ambient:\r\n %.2f C,  %.2f °C\r\n", TA_max, TA_min);
     delay(200);
   }
 
