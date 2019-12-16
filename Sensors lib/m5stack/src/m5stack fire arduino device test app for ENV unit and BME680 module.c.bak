@@ -1,0 +1,169 @@
+
+/*
+    m5stack fire arduino device test app for ENV unit and BME680 module
+    Author ling zhou, 16.8.2019
+    note: need add library Adafruit_BMP280 from library manage
+    note: need add library Adafruit_BME680 from library manage
+
+*/
+
+
+
+#include <M5Stack.h>
+//#include "utility/Power.h"
+
+#include "DHT12.h"
+
+#include <Wire.h> //The DHT12 uses I2C comunication.
+
+#include "Adafruit_Sensor.h"
+#include "Adafruit_BME680.h"
+#include "Adafruit_BMP280.h"
+//For #include "filename" the preprocessor searches first in the same directory as the file containing the directive, and then follows the search path used for the #include <filename> form. This method is normally used to include programmer-defined header files.
+
+
+//DHT address:  0x5C
+DHT12 dht12; //Preset scale CELSIUS and ID 0x5c.
+Adafruit_BME680 bme680; // I2C  0x76
+Adafruit_BMP280 bmp280;  // I2C  0x76
+POWER m5_power;
+//global vars
+float pressure = 0;
+float T_bmp = 0;
+float Alt_bmp = 0;
+float Altitude = 0; // in meter @ 25 degree
+bool dht12_ok = false;
+bool bmp280_ok = false;
+bool bme680_ok = false;
+//POWER.ShutdownTime SHDT；
+
+//SHDT = ShutdownTime.SHUTDOWN_64S; // SHDT is assigned a particular enum value
+
+void setup() {
+  //void M5Stack::begin(bool LCDEnable, bool SDEnable, bool SerialEnable, bool I2CEnable)
+  M5.begin();
+  m5_power.begin();
+  //POWER::ShutdownTime SHDT; // SHDT is declared as the enum
+  //SHDT = POWER::ShutdownTimeSHUTDOWN_64S;
+  m5_power.setLightLoadShutdownTime(); //SHUTDOWN_64S
+  //m5_power.setLowPowerShutdownTime(POWER::ShutdownTime::SHUTDOWN_64S);
+  m5_power.setPowerBoostSet(true); //短按开关boost, 1:enable
+  m5_power.setPowerVin(true);//VIN拔出后，是否开启 Boost
+  //m5_power.setPowerBoostOnOff(true)
+  Wire.begin();
+  bool ip5306status = m5_power.isCharging();
+  Serial.println( "ip5306status:");
+  Serial.println(  ip5306status);
+
+  M5.Lcd.setBrightness(50);  //define BLK_PWM_CHANNEL 7  PWM
+
+
+
+  Serial.println(F("ENV Unit(DHT12 and BMP280) test..."));
+
+  if (dht12.begin(0x5c))
+  //if (bmp280.begin(0x76))
+  {
+    dht12_ok  = true ;
+    bmp280_ok = true ;
+    Serial.println(" BMP280 sensor is connected");
+
+  }
+  else if (bme680.begin(0x76))
+  {
+    bme680_ok = true ;
+    Serial.println(" BME680 sensor is connected");
+
+  }
+  else {
+    while (!bmp280.begin(0x76)) {
+
+      Serial.println("Could not find a valid BMP280 sensor, check wiring!");
+
+      M5.Lcd.println("Could not find a valid BMP280 sensor, check wiring!");
+      delay(100);
+
+
+    }
+  }
+
+  M5.Lcd.clear(BLACK);
+
+  M5.Lcd.setCursor(0, 220);
+  M5.Lcd.setTextSize(2);
+  M5.Lcd.setTextColor(GREEN, BLACK);
+  if (dht12_ok)
+  M5.Lcd.println("ENV DHT12+BMP280 test V2.1");
+  else 
+  M5.Lcd.println("ENV BME680 test V1.1");
+  
+  //lcd.font(lcd.FONT_Default) #改变字体
+
+
+
+}
+
+
+
+void loop() {
+  bme680_ok =true ;
+  int Akku_level = m5_power.getBatteryLevel();
+  float hum =0;
+  float tmperature=0;
+  if (dht12_ok){
+  tmperature = dht12.readTemperature(); // not very accurate
+
+  hum = dht12.readHumidity();
+  }
+  
+
+  
+  if (bmp280_ok) {
+    pressure = bmp280.readPressure() / 100;
+    T_bmp = bmp280.readTemperature();
+    Alt_bmp = bmp280.readAltitude();
+    Altitude = 8.5 * (1013.25 - pressure); // in meter @ 25 degree
+    Altitude = Altitude + (T_bmp - 22) * 0.2273; // compensation for temperature,
+    Serial.printf("T_bmp =  %2.2f*C  BMP280 Altitude: %0.2f M  Altitude: %0.2f M\r\n", T_bmp, Alt_bmp, Altitude);
+
+  }
+  else if (bme680_ok) {
+    pressure = bme680.readPressure() / 100;
+    T_bmp = bme680.readTemperature();
+    float Gas = bme680.readGas();
+    float Hum_BME680= bme680.readHumidity();
+    Alt_bmp = bme680.readAltitude(1013.25);
+    Altitude = 8.5 * (1013.25 - pressure); // in meter @ 25 degree
+    Altitude = Altitude + (T_bmp - 22) * 0.2273; // compensation for temperature,
+    Serial.printf("T_bme680 =  %2.2f*C Humidity: %0.2f%% Gas: %d \r\nBME680 Altitude: %0.2f M  Altitude: %0.2f M\r\n", T_bmp, Hum_BME680,Gas,Alt_bmp, Altitude);
+  }
+
+  
+  //Serial.printf("Temperatura: %2.2f*C  Humidity: %0.2f%%  A.Pres.: %0.2fPa\r\n", tmperature, hum, pressure);
+ 
+
+  M5.Lcd.setCursor(0, 0);
+
+  M5.Lcd.setTextColor(WHITE, BLACK);
+
+  M5.Lcd.setTextSize(3);
+
+  if  (dht12_ok)
+ { Serial.printf("Temperatura: %2.2f*C  Humidity: %0.2f%%  A.Pres.: %0.2fPa\r\n", T_bmp, hum, pressure);
+  M5.Lcd.printf("Temp: %2.1f C \r\nHumi: %3.1f%%  \r\nPressure:%0.2fPa\r\nAltitude:%0.1f M\r\n", tmperature, hum, pressure , Altitude);
+ }
+  M5.Lcd.setTextColor(RED, BLACK);
+  M5.Lcd.printf("BMP_T:%0.1f C\r\n", T_bmp);
+  M5.Lcd.printf("BMP_Alt:%0.1f M\r\n", Alt_bmp);
+  if  (bme680_ok)
+ { 
+  M5.Lcd.setTextColor(BLUE, BLACK);
+  M5.Lcd.printf("Gas: %d \r\n",Gas);
+ }
+  M5.Lcd.setCursor(0, 200);
+  M5.Lcd.setTextSize(2);
+  M5.Lcd.setTextColor(ORANGE, BLACK);
+  M5.Lcd.printf("Akku: %3d%%", Akku_level);
+  delay(100);
+
+}
