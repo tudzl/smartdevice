@@ -1,6 +1,5 @@
-
 /* this code is working as APP launcher compatible
- *  Version 6.1  improve MLX90614 smartdevice sensor ,  working with m5stack， 2019.12.14
+ *  Version 6.1  improve MLX90614 smartdevice sensor GUIMZ ,  working with m5stack， 2019.12.14
     Version 6.0  Add MLX90614 smartdevice sensor ,  working with m5stack， 2019.12.10
     Version 5.0  Add altitude base , offset diff measure function
     Version 4.0  HP206C bug fixed!  altitude: ulong changed to long
@@ -11,7 +10,6 @@
     Author ling zhou, 16.8.2019
     note: need add library Adafruit_BMP280 from library manage
     note: need add library Adafruit_BME680 from library manage
-
 */
 
 
