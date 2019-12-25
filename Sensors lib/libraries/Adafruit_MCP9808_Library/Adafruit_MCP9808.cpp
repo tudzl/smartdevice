@@ -75,12 +75,14 @@ bool Adafruit_MCP9808::begin(uint8_t addr) {
  *    @param  addr
  *    @return True if initialization was successful, otherwise false.
  */
+ /*
 bool Adafruit_MCP9808::begin2(uint8_t addr) {
   _i2caddr = addr;
   _wire = &Wire;
   _wire->begin();
   return init();
 }
+*/
 
 
 /*!
@@ -119,7 +121,25 @@ bool Adafruit_MCP9808::init() {
   return true;
 }
 
-/*!
+/*!   wiritten by ZL
+ *    @brief  return the chip Revision
+ *    @param  addr
+ *    @return 16 bitset if initialization was successful, otherwise false.
+ */
+
+uint16_t Adafruit_MCP9808::getRevision(uint8_t addr)
+
+{
+
+  uint16_t res = read16(MCP9808_REG_DEVICE_ID);
+  //0x0400)
+   //revision starts from 0x00
+   res &= 0x00FF;
+  //write16(MCP9808_REG_CONFIG, 0x0);
+  return res;
+}
+
+/*!  seems not correct!  Temperature = (mcp_temp_H * 16 + Temperature / 16.0);
  *   @brief  Reads the 16-bit temperature register and returns the Centigrade
  *           temperature as a float.
  *   @return Temperature in Centigrade.
@@ -135,6 +155,74 @@ float Adafruit_MCP9808::readTempC() {
   return temp;
 }
 
+
+/*!   wiritten by ZL
+ *   Temperature = (mcp_temp_H * 16 + Temperature / 16.0);
+ *   @brief  Reads the 16-bit temperature register and returns the raw values
+ */
+uint16_t Adafruit_MCP9808::readTempRaw() {
+  uint16_t t = read16(MCP9808_REG_AMBIENT_TEMP);
+
+  //float temp = t & 0x0FFF;
+  //temp /= 16.0;
+  //if (t & 0x1000)
+  //  temp -= 256;
+
+  return t;
+}
+
+/*!   wiritten by ZL
+ *   Temperature = (mcp_temp_H * 16 + Temperature / 16.0);
+ *   @brief  Reads the 16-bit temperature register and returns the Centigrade
+ *           temperature as a float.
+ *   @return Temperature in Centigrade.
+ */
+float Adafruit_MCP9808::readTemperature() {
+  uint16_t t = read16(MCP9808_REG_AMBIENT_TEMP);
+
+   //0x1F  to clear flags
+  uint8_t  Hi =  (t & 0x1F00) >>8;
+  uint8_t  Lo =  (t & 0x00FF) ;
+  float temp =Lo;
+  /*
+  UpperByte = UpperByte & 0x1F; //Clear flag bits
+if ((UpperByte & 0x10) == 0x10){ //TA < 0°C
+UpperByte = UpperByte & 0x0F; //Clear SIGN
+Temperature = 256 - (UpperByte x 16 + LowerByte / 16);
+}else //TA ³ 0°C
+Temperature = (UpperByte x 16 + LowerByte / 16);
+//Temperature = Ambient Temperature (°C)
+  */
+  if ((Hi& 0x10)== 0x10){
+	  //negative
+	  Hi = Hi & 0x0F; //Clear SIGN
+      temp = 256.0 - (Hi * 16 + temp / 16.0);
+  }
+  else   temp = (Hi * 16 + temp / 16.0);
+  
+  return temp;
+}
+
+/*!   wiritten by ZL, test only 
+ *   Temperature = (mcp_temp_H * 16 + Temperature / 16.0);
+ *   @brief  Reads the 16-bit temperature register , abstract low 8 bits and returns the Centigrade
+ *           temperature as a float.
+ *   @return Temperature in Centigrade.
+ */
+float Adafruit_MCP9808::readTemperature2() {
+  uint16_t t = read16(MCP9808_REG_AMBIENT_TEMP);
+
+   //0x1F  to clear flags
+  //uint8_t  Hi =  (t & 0x1F00) >>8;
+  uint8_t  Lo =  (t & 0x00FF) ;
+  float temp =(float)Lo/16.0;
+  
+
+  
+  return temp;
+}
+
+
 /*!
  *   @brief  Reads the 16-bit temperature register and returns the Fahrenheit
  *           temperature as a float.
@@ -145,6 +233,7 @@ float Adafruit_MCP9808::readTempF() {
 
   float temp = t & 0x0FFF;
   temp /= 16.0;
+  //bit 12 Sign: Sign bit
   if (t & 0x1000)
     temp -= 256;
 
@@ -186,6 +275,14 @@ void Adafruit_MCP9808::wake() {
 }
 
 /*!
+ *   @brief  Wake up MCP9808
+ *   NO delays
+ */
+void Adafruit_MCP9808::wakeup() {
+  shutdown_wake(false);
+  //delay(250);
+}
+/*!
  *   @brief  Get Resolution Value
  *   @return Resolution value
  */
@@ -220,7 +317,8 @@ void Adafruit_MCP9808::write16(uint8_t reg, uint16_t value) {
  *    @return value
  */
 uint16_t Adafruit_MCP9808::read16(uint8_t reg) {
-  uint16_t val = 0xFFFF;
+  //uint16_t val = 0xFFFF;  //ori
+  uint16_t val ;
   uint8_t state;
 
   _wire->beginTransmission(_i2caddr);
