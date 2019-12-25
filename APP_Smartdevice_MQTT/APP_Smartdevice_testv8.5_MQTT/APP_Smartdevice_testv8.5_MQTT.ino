@@ -4,7 +4,8 @@
     Problem list： To add WiFiMQTTManager.h( related esp8266 lib is problemmatic!
     TO DO TASK:  3. ESP32-->PIC UART communication! 4. Max30205 limit alert setting function
     Doing now: 3.ESP32-->PIC UART communication
-    Version 8.5 MQTTT wifi config and store para is OK! wifi check and roll back to def 4 if failed is tested OK!
+    Version 8.6 MQTT AT is missing bug fixed! 2019.12.24
+    Version 8.5 MQTT wifi config and store para is OK! wifi check and roll back to def 4 if failed is tested OK!
     Version 8.3 MQTT last will active！ need test, need add new wifi failed, then switch to def 4
     Version 8.2 MQTT wifi config and store para info is done！ need test and improve
     Version 8.1 MQTT Ta data source sellect from max30205, BME280, max30205  bug fixed!
@@ -83,7 +84,7 @@
 #include "Adafruit_BME680.h"
 #include "Adafruit_BMP280.h"
 #include "Adafruit_BME280.h"
-#include <BH1750FVI.h>
+#include "BH1750FVI.h"
 #include <HP206C_Zlib.h>
 #include <ZFilter.h>
 #include <MAX44009.h>  //Wide 0.045 Lux to 188,000 Lux Range
@@ -1515,9 +1516,14 @@ void loop() {
       dtostrf(hum, 2, 2, msg);
       strcat(MQTT_payload, msg);
 
-      //A
+      //AP
       strcat(MQTT_payload, ",AP=");
       dtostrf(pressure, 4, 2, msg);
+      strcat(MQTT_payload, msg);
+      
+      //AT
+      strcat(MQTT_payload, ",AT=");
+      dtostrf(A_Kfilter, 4, 2, msg); //ori var Altitude
       strcat(MQTT_payload, msg);
 
 
