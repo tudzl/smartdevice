@@ -1,5 +1,6 @@
 /* this code is working as APP launcher compatible
- *  Version 6.1  improve MLX90614 smartdevice sensor GUIMZ ,  working with m5stack， 2019.12.14
+ *  Version 6.2  improve max30205 sensor GUI  ,  working with m5stack， 2019.12.25
+    Version 6.1  improve MLX90614 smartdevice sensor GUIMZ ,  working with m5stack， 2019.12.14
     Version 6.0  Add MLX90614 smartdevice sensor ,  working with m5stack， 2019.12.10
     Version 5.0  Add altitude base , offset diff measure function
     Version 4.0  HP206C bug fixed!  altitude: ulong changed to long
@@ -33,6 +34,7 @@ Adafruit_MLX90614 MLX90614 = Adafruit_MLX90614();
 #include "Adafruit_BME680.h"
 #include "Adafruit_BMP280.h"
 #include <HP206C_Zlib.h>
+#include "Protocentral_MAX30205.h" //body T sensor
 #include <ZFilter.h>
 //For #include "filename" the preprocessor searches first in the same directory as the file containing the directive, and then follows the search path used for the #include <filename> form. This method is normally used to include programmer-defined header files.
 //bmp280 address:  0x76
@@ -46,6 +48,8 @@ DHT12 dht12; //Preset scale CELSIUS and ID 0x5c.
 Adafruit_BME680 bme680; // I2C  0x76
 Adafruit_BMP280 bmp280;  // I2C  0x76
 HP20x_dev HP206;  // I2C  0x76
+MAX30205 MAX30205_sensor;
+
 POWER m5_power;
 //global vars
 float pressure = 0;
@@ -58,6 +62,13 @@ float T_MLX_self = 0;
 
 float T_max, T_min = 0; // for object
 float TA_max, TA_min = 0; // for ambient
+//max30205
+bool MAX30205_ok = false;
+double T_max30205 = 0;
+unsigned int MAX30205_Range_H = 50;
+unsigned int MAX30205_Range_L = 0;
+float MAX30205_TOV = 27;
+float MAX30205_HYST = 26;
 
 //status vars
 bool dht12_ok = false;
@@ -65,6 +76,7 @@ bool bmp280_ok = false;
 bool bme680_ok =  false;
 bool HP206_ok = false;
 bool MLX90614_ok = false;
+
 unsigned int HP206_DSR = 256; // down sampling rate
 float hum = 0;
 float tmperature = 0;
@@ -251,7 +263,24 @@ void setup() {
     T_min = T_max;
     TA_max =   MLX90614.readAmbientTempC();
     TA_min = TA_max;
+    if (MAX30205_sensor.begin2())
+    {
+      Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+     
+      MAX30205_ok = true;
+      delay(50);
+      Serial.println("* MAX30205 high precision body temperature sensor is connected!");
+      M5.Lcd.println("* MAX30205 high precision T sensor is connected!");
+      Serial.println("  16-Bit (0.00390625°C) Temperature Resolution!");
+      Serial.println("  0.1°C Accuracy (37°C to 39°C)!");
+      Serial.println("  Operating range: 0°C to 50°C !");
+      Serial.println("  configuration of Thyst and TOS finished");
+      Serial.println("--->Regs settings readout:");
+      MAX30205_sensor.printRegisters();
+      Serial.println("##: Auto mode, Thyst is 29 degree, TOS is 30 degree!");
+      delay(100);
 
+    }
 
   }
   else {
@@ -324,6 +353,12 @@ void loop() {
     TA_min = min(TA_min, T_MLX_self);
     Serial.printf("--: MLX90614 Max and min object Temperature =  %.2f °C, %.2f °C\r\n", T_max, T_min);
     Serial.printf("--: MLX90614 Max and min Ambient Temperature =  %.2f °C, %.2f °C\r\n", TA_max, TA_min);
+
+    if (MAX30205_ok) {
+      T_max30205 = MAX30205_sensor.getTemperature();
+      Serial.printf("-->: MAX30205 body T =  %.3f °C\r\n", T_max30205 );
+    }
+
   }
 
   //-----------HP206 ----------------
@@ -404,15 +439,25 @@ void loop() {
     //T_MLX_obj ;
     M5.Lcd.printf("NCIR T: %.2f C\r\n", T_MLX_obj);
     M5.Lcd.println("");
+    if (MAX30205_ok) {
+      //T_max30205 = MAX30205_sensor.getTemperature();
+      M5.Lcd.setTextColor(GREEN, BLACK);
+      M5.Lcd.printf("Body T = %.3f C\r\n", T_max30205 );
+    }
     M5.Lcd.setTextColor(LIGHTGREY, BLACK);
     //T_MLX_self ;
     M5.Lcd.printf("AmbientT: %.2f C\r\n", T_MLX_self);
     M5.Lcd.setTextSize(2);
+    M5.Lcd.println("");
     M5.Lcd.setTextColor(WHITE, BLACK);
     M5.Lcd.printf("Max & Min object:\r\n %.2f C,  %.2f °C\r\n", T_max, T_min);
     M5.Lcd.setTextColor(BLUE, BLACK);
     M5.Lcd.printf("Max & Min Ambient:\r\n %.2f C,  %.2f °C\r\n", TA_max, TA_min);
     delay(200);
+
+
+
+
   }
 
 
@@ -473,11 +518,11 @@ void loop() {
 
 
 
-
+  //-------sys status GUI-------------------------------------
   M5.Lcd.setCursor(0, 220);
   M5.Lcd.setTextSize(2); //size 2 to 8
   M5.Lcd.setTextColor(ORANGE, BLACK);
-  M5.Lcd.printf("Akku: %3d%%   Run:%d", Akku_level, run_cnt);
+  M5.Lcd.printf("Akku: %3d%%   Run:%d ", Akku_level, run_cnt);
 
   M5.update(); // This function reads The State of Button A and B and C.
 
@@ -516,3 +561,4 @@ void loop() {
   //delay(10); //100ms
 
 }
+//_______________________________________end loop____________________________________________
