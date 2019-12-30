@@ -1,0 +1,19 @@
+{
+  "name": "LPS35HW",
+  "keywords": "pressure, temperature, baro, LPS35HW, LPS22, LPS22HB, LPS33Q, LPS33HW",
+  "description": "LPS35HW pressure sensor library",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/pilotak/LPS35HW.git"
+  },
+  "authors":
+  {
+      "name": "Pavel Slama",
+      "email": "info@pavelslama.cz",
+      "url": "https://github.com/pilotak"
+  },
+  "version": "1.0.1",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
