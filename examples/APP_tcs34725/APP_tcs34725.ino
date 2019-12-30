@@ -84,4 +84,27 @@ void loop(void) {
   Serial.print("B: "); Serial.print(b, DEC); Serial.print(" ");
   Serial.print("C: "); Serial.print(c, DEC); Serial.print(" ");
   Serial.println(" ");
+  if (TCS_sensor_ok) {
+   
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.setCursor(0, 20);
+    M5.Lcd.setTextColor(LIGHTGREY, BLACK);
+    M5.Lcd.printf("Lux:%d \r\n", lux);
+    M5.Lcd.setTextColor(YELLOW, BLACK);
+    M5.Lcd.printf("CCT:%d K\r\n", colorTemp);
+    //M5.Lcd.printf("Gain:%dX, T:%d ms \r\n", rgb_sensor.againx, rgb_sensor.atime_ms);
+    M5.Lcd.setTextColor(WHITE, BLACK);
+    M5.Lcd.printf("Raw R:%d, G:%d ,B:%d ,C:%d \r\n", r, g, b, c);
+  }
+
+
+    //SYS  GUI
+  int Akku_level = m5_power.getBatteryLevel();
+  M5.Lcd.setCursor(0, 220);
+  M5.Lcd.setTextSize(2); //size 2 to 8
+  M5.Lcd.setTextColor(ORANGE, BLACK);
+  M5.Lcd.printf("Akku: %3d%%   Run:%d", Akku_level, run_cnt);
+
+  M5.update(); // This function reads The State of Button A and B and C.
+  run_cnt++;
 }
