@@ -1,7 +1,7 @@
 /* this code is working as APP launcher compatible
     LPS35HW air pressure sensor basic test app
-    Version 1.0  improve sensor GUI ,  working with m5stack，  30.12.2019
-
+    Version 1.1  improve sensor GUI ,  working with m5stack，  30.12.2019
+    LPS35HW pressure: 24bits, 0.000244140625 hpa/LSB
     m5stack fire arduino device test app for TCS34725 module
     Author ling zhou, 30.12.2019
     note: need real device test
@@ -19,12 +19,12 @@
 
 LPS35HW lps;
 bool LPS_sensor_ok = false;
-
+double Altitude =0;
 POWER m5_power;
 unsigned long run_cnt = 0;
 
 void setup() {
-
+  M5.begin();
 
 
   //for app flash back
@@ -36,7 +36,7 @@ void setup() {
   //Serial.begin(9600);
   Serial.println("LPS barometer test");
 
-  M5.begin();
+  
   M5.Lcd.setBrightness(50);  //define BLK_PWM_CHANNEL 7  PWM
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(WHITE, BLACK);
@@ -65,11 +65,17 @@ void loop() {
   float pressure = lps.readPressure();  // hPa
   float temp_lps = lps.readTemp();  // °C
 
+   Altitude = 8.5 * (1013.25 - pressure); // in meter @ 25 degree
+    //Altitude = Altitude + (T_bmp - 22) * 0.2273; // compensation for temperature,
+
   Serial.print("Pressure: ");
   Serial.print(pressure);
   Serial.print("hPa\ttemperature: ");
   Serial.print(temp_lps);
   Serial.println("*C\n");
+  Serial.printf("Altitude: %.2f m \r\n",Altitude);
+  
+  
 
   if (LPS_sensor_ok) {
 
@@ -79,6 +85,8 @@ void loop() {
     M5.Lcd.printf("A.P.:%.3f hPa\r\n", pressure);
     M5.Lcd.setTextColor(YELLOW, BLACK);
     M5.Lcd.printf("T.:%.2f C\r\n", temp_lps);
+
+    M5.Lcd.printf("Alt.: %.2f m \r\n",Altitude);
     //M5.Lcd.printf("Gain:%dX, T:%d ms \r\n", rgb_sensor.againx, rgb_sensor.atime_ms);
    
 
