@@ -42,7 +42,8 @@ bool TCS_sensor_ok = false;
 uint16_t R_pre, G_pre, B_pre, C_pre, colorTemp_pre, lux_pre; // store previous values
 uint16_t r, g, b, c, colorTemp, colorTemp_uni, lux;
 uint16_t low_light_thre = 5000 ;
-uint16_t mid_light_thre = 50000 ;
+uint16_t mid_light_thre = 40000 ;
+int lux_range = 1; //def 1 for low light; 2, 3
 // to store current value to previous vars
 void buttonB_wasPressed(void) {
   //M5.Speaker.beep();  // too laud
@@ -98,10 +99,37 @@ void setup(void) {
 
 void loop(void) {
 
-  if (c < low_light_thre)
-    tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
-  else if (c < mid_light_thre)  tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
-  else tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS); // for high light
+  if ((c < low_light_thre) && (lux_range > 1) ){
+    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
+    lux_range -= 1 ;
+  }
+  else if (c < mid_light_thre) {
+
+    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+    lux_range += 0;
+  }
+  else {
+    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS); // for higher light
+    lux_range += 1;
+  }
+  lux_range = min(3, lux_range);
+  lux_range = max(1, lux_range);
+
+  switch (lux_range) {
+    case 1:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+      break;
+    case 2:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS);
+      break;
+    case 3:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS);
+      break;
+    default:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+      break;
+  }
+
 
   long Zeit_anfang = millis();
   tcs.getRawData(&r, &g, &b, &c);
@@ -132,9 +160,9 @@ void loop(void) {
     M5.Lcd.setTextColor(WHITE, BLACK);
     M5.Lcd.printf("Lux:%d \r\n", lux);
     M5.Lcd.setTextColor(YELLOW, BLACK);
-    M5.Lcd.printf("CCT(DN40):%d K\r\n", colorTemp);
+    M5.Lcd.printf("CCT(DN40):%d K \r\n", colorTemp);
     M5.Lcd.setTextColor(GREENYELLOW, BLACK);
-    M5.Lcd.printf("CCT(ref):%d K\r\n", colorTemp_uni);
+    M5.Lcd.printf("CCT(ref):%d K \r\n", colorTemp_uni);
     //M5.Lcd.printf("Gain:%dX, T:%d ms \r\n", rgb_sensor.againx, rgb_sensor.atime_ms);
     M5.Lcd.setTextSize(2);
     M5.Lcd.setTextColor(RED, BLACK);
@@ -142,7 +170,7 @@ void loop(void) {
     M5.Lcd.setTextColor(GREEN, BLACK);
     M5.Lcd.printf("G:%d ", g);
     M5.Lcd.setTextColor(BLUE, BLACK);
-    M5.Lcd.printf("B:%d  \r\n",  b);
+    M5.Lcd.printf("B:%d \r\n",  b);
     M5.Lcd.setTextColor(WHITE, BLACK);
     M5.Lcd.printf("Clear L.:%d \r\n",  c);
     M5.Lcd.setTextColor(PINK, BLACK);
