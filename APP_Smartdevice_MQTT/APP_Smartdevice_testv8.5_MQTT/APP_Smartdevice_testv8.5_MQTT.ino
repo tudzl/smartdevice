@@ -4,6 +4,7 @@
     Problem list： To add WiFiMQTTManager.h( related esp8266 lib is problemmatic!
     TO DO TASK:  3. ESP32-->PIC UART communication! 4. Max30205 limit alert setting function
     Doing now: 3.ESP32-->PIC UART communication
+    Version 8.7 Vibration value  bug fixed! 2019.12.31
     Version 8.6 MQTT AT is missing bug fixed! 2019.12.24
     Version 8.5 MQTT wifi config and store para is OK! wifi check and roll back to def 4 if failed is tested OK!
     Version 8.3 MQTT last will active！ need test, need add new wifi failed, then switch to def 4
@@ -717,6 +718,18 @@ void setup() {
   M5.begin();
 
   Wire.begin();
+
+
+/*
+ //launch app!!!
+  if (digitalRead(BUTTON_A_PIN) == 0) {
+    Serial.println("Will Load menu binary");
+    updateFromFS(SD);
+    ESP.restart();
+  }
+*/
+
+  
   pinMode(ledPin, OUTPUT);
   wifi_config = wifi_config_num;
 
@@ -1337,8 +1350,9 @@ void loop() {
     //Show_raw_values();
     show_sci_values();
     Linear_ACC = Calc_linearACC (ACC_X, ACC_Y, ACC_Z) ; // m/s2
-    Vibration = Linear_ACC;
+   
     Linear_ACC = Linear_ACC / Gravity_0; // to G
+    Vibration = Linear_ACC;
     Linear_ACC_max = max(Linear_ACC_max, Linear_ACC);
     Serial.printf("--> current Linear Acc: %.2f G; Max value: %.2f ; Recorded Max: %.2f G\r\n", Linear_ACC, Linear_ACC_max, Linear_ACC_max_last);
     Serial.println("");
