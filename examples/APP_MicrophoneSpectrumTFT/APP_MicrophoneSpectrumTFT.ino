@@ -4,7 +4,7 @@
 
   The microphone signal is sampled and a frequency analysis is performed.
 
-
+  Real device range test： 100 to  5500K, show 1026K @ 1K
   Please install the arduinoFFT library.
   You will find it in the library manager or you can get it from github:
   https://github.com/kosme/arduinoFFT

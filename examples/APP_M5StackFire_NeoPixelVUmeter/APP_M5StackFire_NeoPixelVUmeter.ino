@@ -54,6 +54,8 @@ void setup()
 
   Serial.begin(115200);
   pixels.begin();
+
+  m5_power.begin();
 }
 
 #define NUMBEROFSAMPLES 1000
