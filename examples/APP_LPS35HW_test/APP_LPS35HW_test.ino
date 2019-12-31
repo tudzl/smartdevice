@@ -25,7 +25,7 @@ unsigned long run_cnt = 0;
 
 void setup() {
   M5.begin();
-
+  delay(50);
 
   //for app flash back
   if (digitalRead(BUTTON_A_PIN) == 0) {
