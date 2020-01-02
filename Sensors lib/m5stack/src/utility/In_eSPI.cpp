@@ -5050,7 +5050,7 @@ void writeBlock(uint16_t color, uint32_t repeat)
 
 #elif defined (ILI9488_DRIVER)
 
-#ifdef ESP8266
+  #ifdef ESP8266
 void writeBlock(uint16_t color, uint32_t repeat)
 {
 
@@ -5111,9 +5111,9 @@ void writeBlock(uint16_t color, uint32_t repeat)
   }
 
 }
-#else // Now the code for ESP32 and ILI9488
-
-void writeBlock(uint16_t color, uint32_t repeat)
+  #else // Now the code for ESP32 and ILI9488
+//void writeBlock(uint16_t color, uint32_t repeat)  //ori
+/*void writeBlock(uint16_t color, uint32_t repeat)
 {
   // Split out the colours
   uint32_t r = (color & 0xF800)>>8;
@@ -5179,7 +5179,85 @@ void writeBlock(uint16_t color, uint32_t repeat)
   }
 
 }
-#endif
+*/
+
+//modified by zell, to fit RGB888 inputs, for ESP32
+void writeBlock(uint32_t color, uint32_t repeat)
+{
+  // Split out the colours
+  uint32_t r ;
+  uint32_t g ;
+  uint32_t b ;
+  if (color >0xffff){
+	  //RGB to BGR
+   r = (color & 0xFF0000)>>16;
+   g = (color & 0x00FF00);
+   b = (color & 0x0000FF)<<24;
+  }
+   r = (color & 0xF800)>>8;
+   g = (color & 0x07E0)<<5;
+   b = (color & 0x001F)<<19;
+  // Concatenate 4 pixels into three 32 bit blocks
+  uint32_t r0 = r<<24 | b | g | r;
+  uint32_t r1 = r0>>8 | g<<16;
+  uint32_t r2 = r1>>8 | b<<8;
+
+  if (repeat > 19)
+  {
+    SET_PERI_REG_BITS(SPI_MOSI_DLEN_REG(SPI_PORT), SPI_USR_MOSI_DBITLEN, 479, SPI_USR_MOSI_DBITLEN_S);
+
+    while(repeat>19)
+    {
+      while (READ_PERI_REG(SPI_CMD_REG(SPI_PORT))&SPI_USR);
+      WRITE_PERI_REG(SPI_W0_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W1_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W2_REG(SPI_PORT), r2);
+      WRITE_PERI_REG(SPI_W3_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W4_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W5_REG(SPI_PORT), r2);
+      WRITE_PERI_REG(SPI_W6_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W7_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W8_REG(SPI_PORT), r2);
+      WRITE_PERI_REG(SPI_W9_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W10_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W11_REG(SPI_PORT), r2);
+      WRITE_PERI_REG(SPI_W12_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W13_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W14_REG(SPI_PORT), r2);
+      SET_PERI_REG_MASK(SPI_CMD_REG(SPI_PORT), SPI_USR);
+      repeat -= 20;
+    }
+    while (READ_PERI_REG(SPI_CMD_REG(SPI_PORT))&SPI_USR);
+  }
+
+  if (repeat)
+  {
+    SET_PERI_REG_BITS(SPI_MOSI_DLEN_REG(SPI_PORT), SPI_USR_MOSI_DBITLEN, (repeat * 24) - 1, SPI_USR_MOSI_DBITLEN_S);
+    WRITE_PERI_REG(SPI_W0_REG(SPI_PORT), r0);
+    WRITE_PERI_REG(SPI_W1_REG(SPI_PORT), r1);
+    WRITE_PERI_REG(SPI_W2_REG(SPI_PORT), r2);
+    WRITE_PERI_REG(SPI_W3_REG(SPI_PORT), r0);
+    WRITE_PERI_REG(SPI_W4_REG(SPI_PORT), r1);
+    WRITE_PERI_REG(SPI_W5_REG(SPI_PORT), r2);
+    if (repeat > 8 )
+    {
+      WRITE_PERI_REG(SPI_W6_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W7_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W8_REG(SPI_PORT), r2);
+      WRITE_PERI_REG(SPI_W9_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W10_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W11_REG(SPI_PORT), r2);
+      WRITE_PERI_REG(SPI_W12_REG(SPI_PORT), r0);
+      WRITE_PERI_REG(SPI_W13_REG(SPI_PORT), r1);
+      WRITE_PERI_REG(SPI_W14_REG(SPI_PORT), r2);
+    }
+
+    SET_PERI_REG_MASK(SPI_CMD_REG(SPI_PORT), SPI_USR);
+    while (READ_PERI_REG(SPI_CMD_REG(SPI_PORT))&SPI_USR);
+  }
+
+}
+  #endif
 
 #else // Low level register based ESP32 code for 16 bit colour SPI TFTs
 
