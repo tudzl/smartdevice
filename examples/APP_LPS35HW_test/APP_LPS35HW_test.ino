@@ -19,7 +19,7 @@
 
 LPS35HW lps;
 bool LPS_sensor_ok = false;
-double Altitude =0;
+double Altitude = 0;
 POWER m5_power;
 unsigned long run_cnt = 0;
 
@@ -36,7 +36,7 @@ void setup() {
   //Serial.begin(9600);
   Serial.println("LPS barometer test");
 
-  
+
   M5.Lcd.setBrightness(50);  //define BLK_PWM_CHANNEL 7  PWM
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(WHITE, BLACK);
@@ -52,30 +52,32 @@ void setup() {
     LPS_sensor_ok = true;
   }
 
-  lps.setLowPassFilter(LPS35HW::LowPassFilter_ODR9);  // filter last 9 samples, default off
-  lps.setOutputRate(LPS35HW::OutputRate_1Hz);  // optional, default is 10Hz
-   M5.Lcd.setTextSize(2);
+  if (LPS_sensor_ok) {
+    lps.setLowPassFilter(LPS35HW::LowPassFilter_ODR9);  // filter last 9 samples, default off
+    lps.setOutputRate(LPS35HW::OutputRate_1Hz);  // optional, default is 10Hz
+    M5.Lcd.setTextSize(2);
     M5.Lcd.setCursor(0, 200);
     M5.Lcd.setTextColor(LIGHTGREY, BLACK);
     M5.Lcd.println("Setting:LowPassFilter_ODR9+OutputRate_1Hz");
-  // lps.setLowPower(true);  // optional, default is off
+    // lps.setLowPower(true);  // optional, default is off
+  }
 }
 
 void loop() {
-  float pressure = lps.readPressure();  // hPa
-  float temp_lps = lps.readTemp();  // °C
+  double pressure = lps.readPressure();  // hPa
+  double temp_lps = lps.readTemp();  // °C
 
-   Altitude = 8.5 * (1013.25 - pressure); // in meter @ 25 degree
-    //Altitude = Altitude + (T_bmp - 22) * 0.2273; // compensation for temperature,
+  Altitude = 8.5 * (1013.25 - pressure); // in meter @ 25 degree
+  //Altitude = Altitude + (T_bmp - 22) * 0.2273; // compensation for temperature,
 
   Serial.print("Pressure: ");
   Serial.print(pressure);
   Serial.print("hPa\ttemperature: ");
   Serial.print(temp_lps);
   Serial.println("*C\n");
-  Serial.printf("Altitude: %.2f m \r\n",Altitude);
-  
-  
+  Serial.printf("Altitude: %.2f m \r\n", Altitude);
+
+
 
   if (LPS_sensor_ok) {
 
@@ -84,11 +86,11 @@ void loop() {
     M5.Lcd.setTextColor(GREEN, BLACK);
     M5.Lcd.printf("A.P.:%.3f hPa\r\n", pressure);
     M5.Lcd.setTextColor(YELLOW, BLACK);
-    M5.Lcd.printf("T.:%.2f C\r\n", temp_lps);
+    M5.Lcd.printf("T.:%.3f C\r\n", temp_lps);
 
-    M5.Lcd.printf("Alt.: %.2f m \r\n",Altitude);
+    M5.Lcd.printf("Alt.: %.2f m \r\n", Altitude);
     //M5.Lcd.printf("Gain:%dX, T:%d ms \r\n", rgb_sensor.againx, rgb_sensor.atime_ms);
-   
+
 
   }
 

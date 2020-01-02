@@ -1,9 +1,9 @@
 /* this code is working as APP launcher compatible
     TCS34725 color sensor basic test app
+    Version 1.4  autorange improve
     Version 1.3  dual CCT, auto int time switch   31.12.2019
     Version 1.2  improve  GUI , add loop time   31.12.2019
     Version 1.1  improve sensor GUI ,  working with m5stack，  30.12.2019
-
     m5stack fire arduino device test app for TCS34725 module
     Author ling zhou, 30.12.2019
     note: need real device test
@@ -41,10 +41,12 @@ unsigned long run_cnt = 0;
 bool TCS_sensor_ok = false;
 uint16_t R_pre, G_pre, B_pre, C_pre, colorTemp_pre, lux_pre; // store previous values
 uint16_t r, g, b, c, colorTemp, colorTemp_uni, lux;
-uint16_t low_light_thre = 5000 ;
-uint16_t mid_light_thre = 40000 ;
+uint16_t low_light_thre = 3000 ;
+uint16_t mid_light_thre = 35000 ;
 int lux_range = 1; //def 1 for low light; 2, 3
 // to store current value to previous vars
+
+
 void buttonB_wasPressed(void) {
   //M5.Speaker.beep();  // too laud
   //M5.Speaker.tone(800, 20);
@@ -69,7 +71,7 @@ void setup(void) {
   M5.Lcd.setBrightness(50);  //define BLK_PWM_CHANNEL 7  PWM
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(WHITE, BLACK);
-  M5.Lcd.println(" TCS34725 APP V1.2");
+  M5.Lcd.println(" TCS34725 APP V1.3b");
 
   //for app flash back
   if (digitalRead(BUTTON_A_PIN) == 0) {
@@ -99,36 +101,41 @@ void setup(void) {
 
 void loop(void) {
 
-  if ((c < low_light_thre) && (lux_range > 1) ){
-    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
-    lux_range -= 1 ;
-  }
-  else if (c < mid_light_thre) {
-
-    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
-    lux_range += 0;
-  }
-  else {
-    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS); // for higher light
-    lux_range += 1;
-  }
-  lux_range = min(3, lux_range);
-  lux_range = max(1, lux_range);
-
-  switch (lux_range) {
-    case 1:
-      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
-      break;
-    case 2:
-      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS);
-      break;
-    case 3:
-      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS);
-      break;
-    default:
-      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
-      break;
-  }
+//  if ((c < low_light_thre) && (lux_range > 1) ){
+//    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
+//    lux_range -= 1 ;
+//  }
+//  else if (c < low_light_thre) && (lux_range ==2) {
+//
+//    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+//    lux_range += 0; //no change
+//  }
+//  else if (c < mid_light_thre) {
+//
+//    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+//    lux_range += 0; //no change
+//  }
+//  else {
+//    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS); // for higher light
+//    lux_range += 1;
+//  }
+//  lux_range = min(3, lux_range);
+//  lux_range = max(1, lux_range);
+//
+//  switch (lux_range) {
+//    case 1:
+//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+//      break;
+//    case 2:
+//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS);
+//      break;
+//    case 3:
+//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS);
+//      break;
+//    default:
+//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+//      break;
+//  }
 
 
   long Zeit_anfang = millis();
@@ -158,7 +165,7 @@ void loop(void) {
     M5.Lcd.setTextSize(3);
     M5.Lcd.setCursor(0, 20);
     M5.Lcd.setTextColor(WHITE, BLACK);
-    M5.Lcd.printf("Lux:%d \r\n", lux);
+    M5.Lcd.printf("Lux:%d  \r\n", lux);
     M5.Lcd.setTextColor(YELLOW, BLACK);
     M5.Lcd.printf("CCT(DN40):%d K \r\n", colorTemp);
     M5.Lcd.setTextColor(GREENYELLOW, BLACK);
@@ -174,7 +181,7 @@ void loop(void) {
     M5.Lcd.setTextColor(WHITE, BLACK);
     M5.Lcd.printf("Clear L.:%d \r\n",  c);
     M5.Lcd.setTextColor(PINK, BLACK);
-    M5.Lcd.printf("IR:%d  \r\n",  ir);
+    M5.Lcd.printf("IR:%d   \r\n",  ir);
     M5.Lcd.println("");
   }
   //history GUI
@@ -200,5 +207,54 @@ void loop(void) {
     buttonB_wasPressed();
     //Serial.printf("BtnA was Pressed\r\n");
   }
+
+
+//auto range check and set
+    if (run_cnt % 5 == 0){
+
+      TCS_autorange_set(c);
+    }
+
+  
   run_cnt++;
+}
+
+void TCS_autorange_set( uint16_t c ){
+
+     //c: clear light
+    if ((c < low_light_thre) && (lux_range > 1) ){
+    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
+    lux_range -= 1 ;
+  }
+//  else if( (c < low_light_thre) && (lux_range ==2) ){
+//
+//    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+//    lux_range += 0; //no change
+//  }
+  else if (c < mid_light_thre) {
+
+    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+    lux_range += 0; //no change
+  }
+  else {
+    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS); // for higher light
+    lux_range += 1;
+  }
+  lux_range = min(3, lux_range);
+  lux_range = max(1, lux_range);
+
+  switch (lux_range) {
+    case 1:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+      break;
+    case 2:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS);
+      break;
+    case 3:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS);
+      break;
+    default:
+      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+      break;
+  }
 }

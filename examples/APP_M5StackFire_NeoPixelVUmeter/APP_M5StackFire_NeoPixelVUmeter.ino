@@ -82,10 +82,15 @@ void loop()
   Serial.println(power);
 
   int threshold = 1000;
+
+  //display pixel color based on mic power, threshold increase by 5 times every pixel!
   for (uint8_t n = 0; n < M5STACK_FIRE_NEO_NUM_LEDS; n++)
   {
+    //  static uint32_t   Color(uint8_t r, uint8_t g, uint8_t b) {
+    //return ((uint32_t)r << 16) | ((uint32_t)g <<  8) | b;
+    //}
     pixels.setPixelColor(n, pixels.Color(0, 0, 1));
-    if (power > threshold)  pixels.setPixelColor(n, pixels.Color(100, 0, 0));
+    if (power > threshold)  pixels.setPixelColor(n, pixels.Color(100+n*10, n*5, 0));
     threshold *= 5;
   }
   pixels.show();
