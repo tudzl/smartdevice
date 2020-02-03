@@ -125,6 +125,7 @@ uint16_t PIC_frameend = 0xFF90 ;
 
 
 const float BME280_Hum_offset = 21.8 ; // calibration with Fluke 971, 2020.1.23 for #90 PCB
+const float AP_Hum_comp = 0.18  // Ap =F{ hum * AP_Hum_comp }
 bool BME280_Hum_offset_EN = false; // true if MAX30205 T - BME280 T > 2 degree!
 #define SEALEVELPRESSURE_HPA (1013.25)
 //bmp280 address:  0x76
@@ -166,8 +167,11 @@ float lux_max44009 = 0;
 
 
 float pressure = 0;
+float pressure_comp = 0 ;
 float hum = 0;
-float hum_c = 0;
+float hum_c = 0; 
+float hum_baseline = 0;
+float hum_delta = 0 ;
 float tmperature = 0;
 unsigned char tmperature_source = 0; //0  for bme280, 1 for max30205
 float T_MLX_obj = 0; //NCIR T
@@ -1107,7 +1111,7 @@ void loop() {
     if (MAX30205_ok) {
 
       if ( (tmperature - T_max30205 )> 2){
-        hum_c = hum+BME280_Hum_offset;
+        hum_c = hum+BME280_Hum_offset; //after calibration
         Serial.printf("BME280 Humidity(cal.)= %0.2f %%  \r\n",hum_c);
       }
     }
@@ -1115,10 +1119,13 @@ void loop() {
     Serial.printf("Altitude= %6.2f M \r\n", Altitude);
 
     if (filter_on) {
+      //calc compenstated pressure and altitude
+      pressure_comp = pressure+ hum_delta* AP_Hum_comp ; 
+      Altitude_comp = 8.5 * (1013.25 - pressure_comp); // in meter @ 25 degree
       //ZFilter
       //T_filter = t_filter.Filter(tmperature);
-      P_filter = p_filter.Filter(pressure);
-      A_filter = a_filter.Filter(Altitude);
+      P_filter = p_filter.Filter(pressure_comp);
+      A_filter = a_filter.Filter(Altitude_comp);
       // kalman filter
       //T_Kfilter = t_kalman.Filter(tmperature);
       P_Kfilter = p_kalman.Filter(pressure);
@@ -1134,12 +1141,14 @@ void loop() {
         filter_val = filter_val + filter_buf[idx];
       }
       filter_val = filter_val / Filter_len;
-      filter_buf[idx] = A_filter;
+      //filter_buf[idx] = A_filter;
       //debug outputs
       //Serial.printf("ZFiltered pressure：%0.2f hpa，  Altitude: %0.2f M \r\n",  P_filter, A_filter);
       //Serial.printf("KalmanFiltered pressure：%0.2f hpa，  Altitude: %0.2f M \r\n",  P_Kfilter, A_Kfilter);
       Serial.printf("Filtered Altitude= %0.2f M \r\n", filter_val);
       //Serial.printf("%0.2f;%0.2f;%0.2f\r\n" ,pressure,P_filter,P_Kfilter); // for test plot
+
+     
     }
 
 
@@ -1489,10 +1498,15 @@ void loop() {
       client.publish("MQTT_info_head", "online");
       Serial.println("-->online msg sent!\r\n");
     }
+    //set humidity base line value
+    hum_baseline = hum;
+
+    
   }
 
   if (run_cnt % 10 == 0) {
 
+    hum_delta = hum - hum_baseline ; 
     RFID_READ_TAG();
     Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
 
@@ -1545,12 +1559,14 @@ void loop() {
 
       //H
       strcat(MQTT_payload, ",Hum=");
-      dtostrf(hum, 2, 2, msg);
+      dtostrf(hum_c, 2, 2, msg);  //after calibration
+      //dtostrf(hum, 2, 2, msg);
       strcat(MQTT_payload, msg);
 
       //AP
       strcat(MQTT_payload, ",AP=");
-      dtostrf(pressure, 4, 2, msg);
+      //dtostrf(pressure, 4, 2, msg); //raw values
+      dtostrf(Altitude_comp, 4, 2, msg); //Altitude_comp
       strcat(MQTT_payload, msg);
 
       //AT
