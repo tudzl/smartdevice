@@ -1,0 +1,11 @@
+# GPIO test - By: ling - Mon Jan 6 2020
+
+from fpioa_manager import *
+from Maix import GPIO
+
+fm.register(board_info.LED_R, fm.fpioa.GPIO0)
+
+led_r=GPIO(GPIO.GPIO34,GPIO.OUT)
+led_r.value(0)
+
+led_r.value(1)

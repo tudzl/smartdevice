@@ -1,0 +1,14 @@
+# IIC scan code - By: ling - Mon Jan 6 2020
+
+os.listdir()
+from machine import I2C
+
+i2c = I2C(I2C.I2C0, freq=100000, scl=28, sda=29)
+devices = i2c.scan()
+print(devices)
+
+
+gc.mem_free()
+#480960
+#使用 pye("hello.py") 可以创建文件并进入编辑模式， 快捷键等使用说明可以在这里
+#然后按 Ctrl+S 按 Enter 键保存， 按 Ctrl+Q 退出编辑
