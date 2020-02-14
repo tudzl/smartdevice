@@ -1,7 +1,7 @@
 /*************************************************************
   Author: Ling ZELL,
-  Release date: 2020.02.10
-  Version: 1.3,
+  Release date: 2020.02.13
+  Version: 1.3b,
   M5stack launch APPArduinoJson 6!https://arduinojson.org/v6/assistant/
   data source: https://github.com/BlankerL/DXY-2019-nCoV-Data
   https://github.com/BlankerL/DXY-2019-nCoV-Data
@@ -11,15 +11,12 @@
   Release date: 2020.02.07
   Version: 0.1 (ArduinoJson 5)
   Description: Using Arduino HandBit or ESP32 to read the nCoV data
-
  *************************************************************
   Download latest Mixly with portable Arduino IDE here:
     https://mixly.readthedocs.io/zh_CN/latest/basic/02Installation-update.html
-
   Follow my WeChat Official Accounts: ironpando
   Scan the QR Code here:
     https://ae01.alicdn.com/kf/Hc425e6dfae404d8c832d2f4f752cba876.jpg
-
  *************************************************************/
 #include <M5Stack.h>
 #include <WiFi.h>
@@ -221,14 +218,13 @@ void timerCallback() {
       DynamicJsonBuffer jsonBuffer(512);
       //des
       JsonObject& resultsJson = jsonBuffer.parseObject(results);
-
       if (!resultsJson.success()) {
       Serial.println("parseObject() failed");
       return;
       }
     */
 
-    DynamicJsonDocument  resultsJson(3084); //jsonBuffer  2451,,Input length: 1581
+    DynamicJsonDocument  resultsJson(4096); //jsonBuffer  2451,,Input length: 1581
 
 
     DeserializationError Deserialization_error = deserializeJson(resultsJson, results);//deserializeJson(doc, input);
@@ -460,14 +456,14 @@ void M5_LCD_display_data() {
   M5.Lcd.print("China:");
   M5.Lcd.setCursor(60, 180);
   M5.Lcd.print(CN_confirmedCount);
-
+ //China
   M5.Lcd.setCursor(180, 180);
   M5.Lcd.print(CN_curedCount);
-  M5.Lcd.setTextSize(3);
+  M5.Lcd.setTextSize(2);
   M5.Lcd.setCursor(260, 170);
   M5.Lcd.print(CN_deadCount);
-  Death_rate = float(CN_deadCount / CN_confirmedCount) * 100.0f;
-  Cured_rate = float(CN_curedCount / CN_confirmedCount) * 100.0f;
+  Death_rate = float(CN_deadCount) / float(CN_confirmedCount) * 100.0f;
+  Cured_rate = float(CN_curedCount) / float(CN_confirmedCount) * 100.0f;
   M5.Lcd.setCursor(180, 195);
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(GREEN, BLACK);
@@ -485,7 +481,6 @@ void M5_LCD_display_data() {
   // 在OLED上显示实时疫情数据
   void displayData() {
   u8g2.clearDisplay();
-
   // 绘制表格
   u8g2.drawFrame(0, 16, 128, 48);
   u8g2.drawLine(0, 32, 127, 32);
@@ -493,11 +488,9 @@ void M5_LCD_display_data() {
   u8g2.drawLine(32, 16, 32, 63);
   u8g2.drawLine(64, 16, 64, 63);
   u8g2.drawLine(96, 16, 96, 63);
-
   // 标题
   u8g2.setCursor(18, 2);
   u8g2.print("浙江疫情实时信息");
-
   // 表格类别
   u8g2.setCursor(36, 20);
   u8g2.print("确诊");
@@ -505,7 +498,6 @@ void M5_LCD_display_data() {
   u8g2.print("治愈");
   u8g2.setCursor(100, 20);
   u8g2.print("死亡");
-
   // 浙江情况
   u8g2.setCursor(4, 36);
   u8g2.print("浙江");
@@ -515,7 +507,6 @@ void M5_LCD_display_data() {
   u8g2.print(zj_curedCount);
   u8g2.setCursor(104, 36);
   u8g2.print(zj_deadCount);
-
   // 杭州情况
   u8g2.setCursor(4, 52);
   u8g2.print("杭州");
@@ -526,5 +517,4 @@ void M5_LCD_display_data() {
   u8g2.setCursor(104, 52);
   u8g2.print(hangzhou_deadCount);
   }
-
 */
