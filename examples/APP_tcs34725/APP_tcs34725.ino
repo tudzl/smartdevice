@@ -1,5 +1,6 @@
 /* this code is working as APP launcher compatible
     TCS34725 color sensor basic test app
+    Version 1.5  Lux calc improve according to offiicial fomular
     Version 1.4  autorange improve
     Version 1.3  dual CCT, auto int time switch   31.12.2019
     Version 1.2  improve  GUI , add loop time   31.12.2019
@@ -41,6 +42,7 @@ unsigned long run_cnt = 0;
 bool TCS_sensor_ok = false;
 uint16_t R_pre, G_pre, B_pre, C_pre, colorTemp_pre, lux_pre; // store previous values
 uint16_t r, g, b, c, colorTemp, colorTemp_uni, lux;
+float lux_tao = 0;
 uint16_t low_light_thre = 3000 ;
 uint16_t mid_light_thre = 35000 ;
 int lux_range = 1; //def 1 for low light; 2, 3
@@ -68,6 +70,7 @@ void setup(void) {
 
 
   M5.begin();
+  m5_power.begin();
   M5.Lcd.setBrightness(50);  //define BLK_PWM_CHANNEL 7  PWM
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(WHITE, BLACK);
@@ -101,41 +104,41 @@ void setup(void) {
 
 void loop(void) {
 
-//  if ((c < low_light_thre) && (lux_range > 1) ){
-//    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
-//    lux_range -= 1 ;
-//  }
-//  else if (c < low_light_thre) && (lux_range ==2) {
-//
-//    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
-//    lux_range += 0; //no change
-//  }
-//  else if (c < mid_light_thre) {
-//
-//    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
-//    lux_range += 0; //no change
-//  }
-//  else {
-//    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS); // for higher light
-//    lux_range += 1;
-//  }
-//  lux_range = min(3, lux_range);
-//  lux_range = max(1, lux_range);
-//
-//  switch (lux_range) {
-//    case 1:
-//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
-//      break;
-//    case 2:
-//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS);
-//      break;
-//    case 3:
-//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS);
-//      break;
-//    default:
-//      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
-//      break;
-//  }
+  //  if ((c < low_light_thre) && (lux_range > 1) ){
+  //    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
+  //    lux_range -= 1 ;
+  //  }
+  //  else if (c < low_light_thre) && (lux_range ==2) {
+  //
+  //    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+  //    lux_range += 0; //no change
+  //  }
+  //  else if (c < mid_light_thre) {
+  //
+  //    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+  //    lux_range += 0; //no change
+  //  }
+  //  else {
+  //    //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS); // for higher light
+  //    lux_range += 1;
+  //  }
+  //  lux_range = min(3, lux_range);
+  //  lux_range = max(1, lux_range);
+  //
+  //  switch (lux_range) {
+  //    case 1:
+  //      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+  //      break;
+  //    case 2:
+  //      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS);
+  //      break;
+  //    case 3:
+  //      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_24MS);
+  //      break;
+  //    default:
+  //      tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS);
+  //      break;
+  //  }
 
 
   long Zeit_anfang = millis();
@@ -145,6 +148,7 @@ void loop(void) {
   colorTemp = tcs.calculateColorTemperature_dn40(r, g, b, c); //algorithm described in DN40 from Taos (now AMS).
   colorTemp_uni = tcs.calculateColorTemperature(r, g, b); //general algorithm
   lux = tcs.calculateLux(r, g, b);
+  lux_tao = tcs.calculateLux_tao(r, g, b);
   /* AMS RGB sensors have no IR channel, so the IR content must be */
   /* calculated indirectly. */
   uint16_t ir = (r + g + b > c) ? (r + g + b - c) / 2 : 0;
@@ -153,6 +157,8 @@ void loop(void) {
 
   Serial.print("Color Temp(DN40): "); Serial.print(colorTemp, DEC); Serial.print(" K - ");
   Serial.print("Lux: "); Serial.print(lux, DEC); Serial.print(" - ");
+  Serial.printf("Lux_tao: %.1f",lux_tao); Serial.print(" - ");
+
   Serial.print("R: "); Serial.print(r, DEC); Serial.print(" ");
   Serial.print("G: "); Serial.print(g, DEC); Serial.print(" ");
   Serial.print("B: "); Serial.print(b, DEC); Serial.print(" ");
@@ -166,6 +172,7 @@ void loop(void) {
     M5.Lcd.setCursor(0, 20);
     M5.Lcd.setTextColor(WHITE, BLACK);
     M5.Lcd.printf("Lux:%d  \r\n", lux);
+    M5.Lcd.printf("Lux_t:%d  \r\n",lux_tao);
     M5.Lcd.setTextColor(YELLOW, BLACK);
     M5.Lcd.printf("CCT(DN40):%d K \r\n", colorTemp);
     M5.Lcd.setTextColor(GREENYELLOW, BLACK);
@@ -209,28 +216,28 @@ void loop(void) {
   }
 
 
-//auto range check and set
-    if (run_cnt % 5 == 0){
+  //auto range check and set
+  if (run_cnt % 5 == 0) {
 
-      TCS_autorange_set(c);
-    }
+    TCS_autorange_set(c);
+  }
 
-  
+
   run_cnt++;
 }
 
-void TCS_autorange_set( uint16_t c ){
+void TCS_autorange_set( uint16_t c ) {
 
-     //c: clear light
-    if ((c < low_light_thre) && (lux_range > 1) ){
+  //c: clear light
+  if ((c < low_light_thre) && (lux_range > 1) ) {
     //tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_700MS); // for low light
     lux_range -= 1 ;
   }
-//  else if( (c < low_light_thre) && (lux_range ==2) ){
-//
-//    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
-//    lux_range += 0; //no change
-//  }
+  //  else if( (c < low_light_thre) && (lux_range ==2) ){
+  //
+  //    // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light
+  //    lux_range += 0; //no change
+  //  }
   else if (c < mid_light_thre) {
 
     // tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_154MS); // for mid light

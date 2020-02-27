@@ -100,7 +100,7 @@ void setup() {
   //m5_power.begin();
   M5.Lcd.setBrightness(30);
   M5.Lcd.clear(BLACK);
-
+ //M5.Lcd.drawJpgFile(fs::FS &fs, const char *path, uint16_t x, uint16_t y, uint16_t maxWidth, uint16_t maxHeight, uint16_t offX, uint16_t offY, jpeg_div_t scale);
   M5.Lcd.drawJpgFile(SD, "/NCoV_BG.jpg");
   delay(300);
   M5.Lcd.setCursor(0, 200);
@@ -183,10 +183,9 @@ void setup() {
 void loop() {
   timer2.run();
   //timer2.run();
-  //  if (run_cnt == 1) {
-  //    //increase timer interval
-  //    timer.setInterval(20000L, timerCallback);
-  //  }
+  if (run_cnt == 0) {
+   timerCallback();
+   }
 }
 
 // 定时器回调函数
