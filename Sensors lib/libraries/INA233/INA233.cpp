@@ -59,7 +59,7 @@ void INA233::wireSendCmd(uint8_t reg)
   #else
     Wire.send(reg);                        // PMBus command
   #endif
-  Wire.endTransmission();
+  Wire.endTransmission(true);
 }
 /**************************************************************************/
 /*!
@@ -77,7 +77,7 @@ void INA233::wireWriteByte (uint8_t reg, uint8_t value)
     Wire.send(reg);                        // PMBus command
     Wire.send(value);                      // byte to write
   #endif
-  Wire.endTransmission();
+  Wire.endTransmission(true);
 }
 /**************************************************************************/
 /*!
@@ -97,7 +97,7 @@ void INA233::wireWriteWord (uint8_t reg, uint16_t value)
     Wire.send(value & 0xFF);               // Lower 8-bits, LSB
     Wire.send(value >> 8);                 // Upper 8-bits
   #endif
-  Wire.endTransmission();
+  Wire.endTransmission(true);
 }
 
 /**************************************************************************/
@@ -115,7 +115,7 @@ void INA233::RegWriteWord (uint8_t reg_address, uint16_t data)
 	Wire.write(reg_address);           // Put slave register address in Tx buffer
 	Wire.write(lo);                 // Put data in Tx buffer
 	Wire.write(hi);                 // Put data in Tx buffer
-	Wire.endTransmission();           // Send the Tx buffer
+	Wire.endTransmission(true);           // Send the Tx buffer
 }
 
 /**************************************************************************/
@@ -130,15 +130,20 @@ uint16_t INA233::RegReadWord(uint8_t reg_address)
 	Wire.beginTransmission(ina233_i2caddr);   // Initialize the Tx buffer
 	// Next send the register to be read. OR with 0x80 to indicate multi-read.
 	Wire.write(reg_address);
-	Wire.endTransmission(false);
-	uint8_t i = 0;
-	Wire.requestFrom(ina233_i2caddr, 2,true);  // Read bytes from slave register address, lsb first
+	Wire.endTransmission(true);
+	//uint8_t i = 0;
+	Wire.requestFrom((uint16_t)ina233_i2caddr, (uint8_t)2,true);  // Read bytes from slave register address, lsb first
 	while (Wire.available())
 	{
 		data = Wire.read();
 		//data = data <<8;
 		data += Wire.read()<<8; // MSB second
 	}
+	//Wire.endTransmission(true); // 0:success
+//1:data too long to fit in transmit buffer
+//2:received NACK on transmit of address
+//3:received NACK on transmit of data
+//4:other error
 	return data;
 }
 
@@ -159,9 +164,9 @@ void INA233::wireReadBlock(uint8_t reg, uint8_t value[6])
   	Wire.beginTransmission(ina233_i2caddr);   // Initialize the Tx buffer
 	// Next send the register to be read. OR with 0x80 to indicate multi-read.
 	Wire.write(reg);
-	Wire.endTransmission(false);
+	Wire.endTransmission(true);
 
-	Wire.requestFrom(ina233_i2caddr, count,true);  // Read bytes from slave register address
+	Wire.requestFrom((uint16_t)ina233_i2caddr, count,true);  // Read bytes from slave register address
   for (i=0;i<block_size;i++)
   {
     value[i]=Wire.read();
@@ -188,13 +193,13 @@ void INA233::wireReadBlock(uint8_t reg, uint8_t value[6])
 void INA233::wireReadWord(uint8_t reg, uint16_t *value)
 {
 	
-		uint16_t data ;
+    uint16_t data ;
 	Wire.beginTransmission(ina233_i2caddr);   // Initialize the Tx buffer
 	// Next send the register to be read. OR with 0x80 to indicate multi-read.
 	Wire.write(reg);
-	Wire.endTransmission(false);
-	uint8_t i = 0;
-	Wire.requestFrom(ina233_i2caddr, 2);  // Read bytes from slave register address
+	Wire.endTransmission(true);
+	//uint8_t i = 0;
+	Wire.requestFrom((uint16_t)ina233_i2caddr, (uint8_t)2,true);  // Read bytes from slave register address
 	while (Wire.available())
 	{
 		data = Wire.read();
@@ -221,11 +226,12 @@ void INA233::wireReadWord(uint8_t reg, uint16_t *value)
 void INA233::wireReadByte(uint8_t reg, uint8_t *value)
 {
 	
-		uint8_t data; // `data` will store the register data
+	uint8_t data; // `data` will store the register data
 	Wire.beginTransmission(ina233_i2caddr);
 	Wire.write(reg);
-	Wire.endTransmission(false);
-	Wire.requestFrom(ina233_i2caddr, (uint8_t) 1);
+	Wire.endTransmission(true);
+	//restart scl
+	Wire.requestFrom((uint16_t)ina233_i2caddr, (uint8_t) 1,true);
 	data = Wire.read();
 	 *value = data;
 	//return data;
@@ -247,6 +253,7 @@ uint16_t INA233::ADC_CONFIG (uint16_t data){
 	
     //Wire.beginTransmission(ina233_addr); //included in wireWriteWord
     RegWriteWord(MFR_ADC_CONFIG, data);
+	//Wire.endTransmission();
     return RegReadWord(MFR_ADC_CONFIG);
 	
 	
@@ -396,6 +403,8 @@ INA233::INA233(uint8_t addr) {
   R_c=0;
   m_p=0;
   R_p=0;
+  raw_shunt=0;
+  mV_shunt =0;
 }
 /**************************************************************************/
 /*!
@@ -435,25 +444,28 @@ int16_t INA233::getBusVoltage_raw() {
 }
 /**************************************************************************/
 /*!
-    @brief  Gets the raw shunt voltage (2-byte, two's complement integer
+    @brief  Gets the raw shunt voltage (2-byte, two's complement integer,Full-scale range = 81.92 mV (7FFFh) and LSB:
+2.5 μV.
     received from the device)
 */
 /**************************************************************************/
 int16_t INA233::getShuntVoltage_raw() {
   uint16_t value;
   wireReadWord(MFR_READ_VSHUNT, &value); //0xD1
+  
   return (int16_t)value;
 }
 /**************************************************************************/
-/*!
-    @brief  Gets the raw current value (2-byte, two's complement integer
-    received from the device)
+/*!  modified by zell
+    @brief  Gets the raw current value (2-byte, two's complement integer    received from the device)
+	READ_IN is a standard PMBus command that returns the 16-bit signed value of the sensed current
 */
 /**************************************************************************/
 int16_t INA233::getCurrent_raw() {
-  uint16_t value;
+  uint16_t value; //ori: uint16_t
   wireReadWord(READ_IIN, &value);
-  return (int16_t)value;
+  raw_shunt = (int16_t) value;
+  return raw_shunt;
 }
 /**************************************************************************/
 /*!
@@ -511,10 +523,18 @@ float INA233::getAv_Power_mW() {
 /**************************************************************************/
 float INA233::getShuntVoltage_mV() {
   //uint16_t value=getShuntVoltage_raw();  // uint16?
-  int16_t value=getShuntVoltage_raw();  // uint16?
-  float vshunt;
+  //int16_t value=getShuntVoltage_raw();  // uint16?
+  
+  
+    int16_t value=raw_shunt;
+    if (raw_shunt == 0)
+	  value=getShuntVoltage_raw(); 
+  
+ 
+  double vshunt;
   vshunt=(value*pow(10,-R_vs)-b_vs)/m_vs;
-  return vshunt * 1000;
+  mV_shunt = vshunt;
+  return vshunt * 1000.0;
 }
 
 /**************************************************************************/
@@ -537,29 +557,16 @@ float INA233::getBusVoltage_V() {
 /**************************************************************************/
 float INA233::getCurrent_mA() {
   //uint16_t value=getCurrent_raw(); //bugs
-  int16_t value=getCurrent_raw();
+  int16_t value=getCurrent_raw(); //ori code
+  //int16_t value;
+
   float current;
   current =(value*pow(10,-R_c)-b_c)/m_c;
   return current*1000;
 }
 
 
-/**************************************************************************/
-/*!
-    @brief  Calculate the current value in mA, taking into account the
-            R_shunt and current LSB
-*/
-/**************************************************************************/
-double INA233::CalCurrent_mA(double R_shunt) {
-  //uint16_t value=getCurrent_raw(); //bugs
-  int16_t Raw_value=getCurrent_raw();
-  double current;
-  double uV_LSB = 2.5 ;
-  //R_shunt ohms
-  current = Raw_value * 2.5 / 1000.0 ; // in mV
-  current = current/R_shunt; //in mA
-  return current;
-}
+
 
 /**************************************************************************/
 /*!
@@ -574,3 +581,49 @@ float INA233::getPower_mW() {
   return power*1000;
 }
 
+
+/**************************************************************************/
+/*!  by Zell
+    @brief  Calculate the current value in mA, taking into account the
+            R_shunt and current LSB
+*/
+/**************************************************************************/
+double INA233::CalCurrent_mA(double R_shunt) {
+  //uint16_t value=getCurrent_raw(); //bugs
+  if (R_shunt == 0) 
+	  return -1; //error 
+  
+  double current;
+  double uV_LSB = 2.5 ;
+  
+  if (mV_shunt !=0)
+      current = mV_shunt/R_shunt; //in mA
+  
+  else {
+	    //int16_t Raw_value=getCurrent_raw(); //old api code
+  
+  int16_t Raw_value = getShuntVoltage_raw(); 
+
+  //R_shunt ohms
+  
+  current = (double)Raw_value * 2.5 / (double)1000.0 ; // in mV
+  current = current/R_shunt;
+  }
+  return current;
+}
+
+/**************************************************************************/
+/*!  by Zell
+    @brief  update sensor values from raw shunt voltage
+           
+*/
+/**************************************************************************/
+
+void INA233::update_value(void){
+	
+	 int16_t Raw_value = getShuntVoltage_raw();
+	 raw_shunt = Raw_value;
+     mV_shunt =  (double)Raw_value * 2.5 / (double)1000.0 ; // in mV
+	 //double current = mV_shunt/R_shunt; //in mA
+	
+}

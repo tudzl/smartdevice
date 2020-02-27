@@ -1,6 +1,7 @@
 /*!
  *  @file Adafruit_TCS34725.h
- *
+ *  modified by Zell, 26.02.2020
+ *  tudzl@hotmail.de
  *  Software License Agreement (BSD License)
  *
  *  Copyright (c) 2013, Adafruit Industries
@@ -41,6 +42,12 @@
 
 #include <Wire.h>
 
+const float TCS34725_R_coef = 0.136;
+const float TCS34725_G_coef = 1;
+const float TCS34725_B_coef = 0.444;
+
+#define TCS34725_DA 1.08
+#define TCS34725_GF 310
 #define TCS34725_ADDRESS (0x29)     /**< I2C address **/
 #define TCS34725_COMMAND_BIT (0x80) /**< Command bit **/
 #define TCS34725_ENABLE (0x00)      /**< Interrupt Enable register */
@@ -184,6 +191,7 @@ public:
   uint16_t calculateColorTemperature_dn40(uint16_t r, uint16_t g, uint16_t b,
                                           uint16_t c);
   uint16_t calculateLux(uint16_t r, uint16_t g, uint16_t b);
+  float calculateLux_tao(uint16_t r, uint16_t g, uint16_t b) ; //by zell
   void write8(uint8_t reg, uint32_t value);
   uint8_t read8(uint8_t reg);
   uint16_t read16(uint8_t reg);

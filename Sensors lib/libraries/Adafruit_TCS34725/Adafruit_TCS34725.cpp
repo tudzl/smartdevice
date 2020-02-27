@@ -1,9 +1,16 @@
 /*!
  *  @file Adafruit_TCS34725.cpp
+ 
+ *  modified by Zell, 26.02.2020
+ *  tudzl@hotmail.de
  *
  *  @mainpage Driver for the TCS34725 digital color sensors.
  *
  *  @section intro_sec Introduction
+ *  Lux = (R_Coef * R’ + G_Coef * G’ + B_Coef * B’) / CPL, where:
+ *  CPL = (AGAINx * ATIME_ms) / (GA * DF), and
+ *  R’ = R – IR, G’ = G – IR, B’ = B – IR, where IR = (R + G + B – C)/2.
+ *  CT (degrees Kelvin) = CT_Coef*(B’/R’) + CT_Offset
  *
  *  Adafruit invests time and resources providing this open source code,
  *  please support Adafruit and open-source hardware by purchasing
@@ -488,6 +495,8 @@ uint16_t Adafruit_TCS34725::calculateColorTemperature_dn40(uint16_t r,
 
   /* A simple method of measuring color temp is to use the ratio of blue */
   /* to red light, taking IR cancellation into account. */
+  //AN000166_1-00: CT = CT_coef* B'/R' + CT_offset
+  //B' = B-IR
   uint16_t cct = (3810 * (uint32_t)b2) / /** Color temp coefficient. */
                      (uint32_t)r2 +
                  1391; /** Color temp offset. */
@@ -514,6 +523,39 @@ uint16_t Adafruit_TCS34725::calculateLux(uint16_t r, uint16_t g, uint16_t b) {
 
   return (uint16_t)illuminance;
 }
+
+
+/*! Author Zell, 26.02.2020
+ *  @brief  calc lux based on official method
+ *  @param  r
+ *          Red value
+ *  @param  g
+ *          Green value
+ *  @param  b
+ *          Blue value
+ *  @param  Atime
+ *        
+ *  @param  Again
+ *     
+ *  @return Lux value
+ */
+float Adafruit_TCS34725::calculateLux_tao(uint16_t r, uint16_t g, uint16_t b) {
+  float illuminance;
+  //_tcs34725IntegrationTime
+  //_tcs34725Gain
+  
+  
+  float CPL = (_tcs34725IntegrationTime*_tcs34725Gain)/(TCS34725_DA*TCS34725_GF);
+  illuminance = TCS34725_R_coef*r+ TCS34725_G_coef*g+ TCS34725_B_coef*b;
+  illuminance = illuminance/CPL;
+  /* This only uses RGB ... how can we integrate clear or calculate lux */
+  /* based exclusively on clear since this might be more reliable?      */
+  //illuminance = (-0.32466F * r) + (1.57837F * g) + (-0.73191F * b);
+
+  return illuminance;
+}
+
+
 
 /*!
  *  @brief  Sets inerrupt for TCS34725

@@ -148,6 +148,11 @@ class INA233{
   uint16_t ADC_CONFIG (uint16_t data);//written by zell
   uint16_t RegSetCalibration(uint16_t data);//written by zell
   uint16_t Read_ID(void);
+  // sensor data vars
+  int16_t raw_shunt;
+  double mV_shunt;
+  void update_value(void);
+  
   
  private:
   uint8_t ina233_i2caddr;
