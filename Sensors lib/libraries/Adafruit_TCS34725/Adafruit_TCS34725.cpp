@@ -539,13 +539,30 @@ uint16_t Adafruit_TCS34725::calculateLux(uint16_t r, uint16_t g, uint16_t b) {
  *     
  *  @return Lux value
  */
-float Adafruit_TCS34725::calculateLux_tao(uint16_t r, uint16_t g, uint16_t b) {
+float Adafruit_TCS34725::calculateLux_tao(uint16_t r, uint16_t g, uint16_t b, uint16_t c) {
   float illuminance;
   //_tcs34725IntegrationTime
-  //_tcs34725Gain
+  float Gain =1;
+  float Atime = 700;
+  float IR = (r+g+b-c)/2;
+  r = r- IR;
+  g = g- IR;
+  b = b- IR;
+  
+  if(_tcs34725Gain ==TCS34725_GAIN_1X)
+	  Gain =1;
+  
+  if (_tcs34725IntegrationTime ==TCS34725_INTEGRATIONTIME_700MS)
+	  Atime = 700;
+  else if (_tcs34725IntegrationTime ==TCS34725_INTEGRATIONTIME_154MS)
+	  Atime = 154;
+  else if (_tcs34725IntegrationTime ==TCS34725_INTEGRATIONTIME_24MS)
+	  Atime = 24;
   
   
-  float CPL = (_tcs34725IntegrationTime*_tcs34725Gain)/(TCS34725_DA*TCS34725_GF);
+  
+  
+  float CPL = (Atime*Gain)/(TCS34725_DA*TCS34725_GF);
   illuminance = TCS34725_R_coef*r+ TCS34725_G_coef*g+ TCS34725_B_coef*b;
   illuminance = illuminance/CPL;
   /* This only uses RGB ... how can we integrate clear or calculate lux */

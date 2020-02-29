@@ -191,7 +191,7 @@ public:
   uint16_t calculateColorTemperature_dn40(uint16_t r, uint16_t g, uint16_t b,
                                           uint16_t c);
   uint16_t calculateLux(uint16_t r, uint16_t g, uint16_t b);
-  float calculateLux_tao(uint16_t r, uint16_t g, uint16_t b) ; //by zell
+  float calculateLux_tao(uint16_t r, uint16_t g, uint16_t b, uint16_t c) ; //by zell
   void write8(uint8_t reg, uint32_t value);
   uint8_t read8(uint8_t reg);
   uint16_t read16(uint8_t reg);
