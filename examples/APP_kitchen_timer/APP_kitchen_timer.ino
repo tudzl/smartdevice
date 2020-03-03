@@ -8,6 +8,7 @@
     note2: tst lcd lib modified for RGB888:
     void TFT_eSPI::setTextColor(uint32_t c, uint32_t b)
 */
+#define M5STACK_200Q //// define must ahead #include <M5Stack.h>
 
 #include <M5Stack.h>
 //for use as bin app lovyan03
@@ -37,9 +38,38 @@ uint8_t mm = 3;
 int8_t ss = 0;
 bool hasStop = true;
 bool hasEnd = false;
+
+
+float accX = 0.0F;
+float accY = 0.0F;
+float accZ = 0.0F;
+
+#define CURRENT_400MA  (0x01 << 2)
+//#define M5STACK_MPU6886 
+//#define M5STACK_MPU9250 
+// #define M5STACK_MPU6050
+
+
+byte red = 31;
+byte green = 0;
+byte blue = 0;
+byte state = 0;
+unsigned int color = red << 11; // Colour order is RGB 5+6+5 bits each
+uint8_t screen_dir = 0;
+
 void setup() {
   M5.begin();
   M5.Lcd.setBrightness(50);  //define BLK_PWM_CHANNEL 7  PWM
+  rainbow_fill();
+  //for app flash back
+  if (digitalRead(BUTTON_A_PIN) == 0) {
+    Serial.println("Will Load menu binary");
+    updateFromFS(SD);
+    ESP.restart();
+  }
+  delay(500);
+    m5_power.begin();//M5.powerOFF(); soft power off
+  m5_power.setVinMaxCurrent(CURRENT_400MA );
   M5.Lcd.fillScreen(C_RGB565(TFT_IVORY)); //In_eSPI.H
   //void writeBlock(uint16_t color, uint32_t repeat)
   //void TFT_eSPI::fillScreen(uint32_t color)
@@ -52,7 +82,7 @@ void setup() {
 
 
   targetTime = millis() + 1000;
-
+  screen_dir = M5.Lcd.getRotation();
   M5.Lcd.setTextFont(2);
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor888(TFT_BLACK, TFT_IVORY);
@@ -70,9 +100,24 @@ void setup() {
   M5.Lcd.print("/STOP");
 
   Serial.println("START");
+
+  M5.IMU.Init(); //define first
+  
+  
 }
 
 void loop() {
+  //screen auto rotate,setRotation
+  M5.IMU.getAccelData(&accX,&accY,&accZ);
+  if (accY<-0.4){
+  M5.Lcd.setRotation(screen_dir+2);
+  }
+  else if (accY>0.4){
+    M5.Lcd.setRotation(screen_dir);
+    //setRotation
+  }
+
+  
   if (M5.BtnC.wasPressed() && !hasStop) {
     hasStop = true;
   } else if (M5.BtnC.wasPressed() && hasStop) {
@@ -231,4 +276,64 @@ uint16_t C_RGB565 ( uint32_t color) {
     return RGB565_color;
   }
   else return color;
+}
+
+
+// Fill screen with a rainbow pattern
+void rainbow_fill()
+{
+  // The colours and state are not initialised so the start colour changes each time the funtion is called
+  int rotation = M5.Lcd.getRotation();
+  M5.Lcd.setRotation(random(4));
+  for (int i = M5.Lcd.height() - 1; i >= 0; i--) {
+    // This is a "state machine" that ramps up/down the colour brightnesses in sequence
+    switch (state) {
+      case 0:
+        green ++;
+        if (green == 64) {
+          green = 63;
+          state = 1;
+        }
+        break;
+      case 1:
+        red--;
+        if (red == 255) {
+          red = 0;
+          state = 2;
+        }
+        break;
+      case 2:
+        blue ++;
+        if (blue == 32) {
+          blue = 31;
+          state = 3;
+        }
+        break;
+      case 3:
+        green --;
+        if (green == 255) {
+          green = 0;
+          state = 4;
+        }
+        break;
+      case 4:
+        red ++;
+        if (red == 32) {
+          red = 31;
+          state = 5;
+        }
+        break;
+      case 5:
+        blue --;
+        if (blue == 255) {
+          blue = 0;
+          state = 0;
+        }
+        break;
+    }
+    color = red << 11 | green << 5 | blue;
+    // Draw a line 1 pixel wide in the selected colour
+    M5.Lcd.drawFastHLine(0, i, M5.Lcd.width(), color); // in this example M5.Lcd.width() returns the pixel width of the display
+  }
+  M5.Lcd.setRotation(rotation);
 }
