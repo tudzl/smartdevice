@@ -1,3 +1,9 @@
+#Speicial note:
+Modifiled by Zell to support RGB888 color for text display:
+In_eSPI.h and cpp:
+	   setTextColor888(uint32_t fgcolor, uint32_t bgcolor), //by zell
+    
+
 # M5Stack Library
 
 English | [中文](docs/getting_started_cn.md) | [日本語](docs/getting_started_ja.md)
