@@ -130,7 +130,9 @@ devices = os.listdir("/")
 if "sd" in devices:
     os.chdir("/sd")
     sys.path.append('/sd')
-    print("Micro SD detected")
+    print("------------------")
+    print("Micro SD detected!")
+    print("------------------")
     print(os.listdir())
 else:
     os.chdir("/flash")
