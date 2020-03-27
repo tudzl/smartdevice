@@ -1,7 +1,17 @@
 # ESP32_SSD1331
-This is Arduino core for the ESP32 library ( SPI ).  
+This is SSD1331 RGB OLED Arduino core for the ESP32 library ( SPI ).  
+Original code is modified and test by zell
 Beta ver 1.71
 HSPI only.  
+(ESp32 wrover example)   
+#define SCK 14
+#define DC 27  //low for CMD
+#define MOSI 13
+#define MISO 12
+#define CS 15
+#define RST 4
+#define SPI_Freq 6000000
+#define LED_pin 5  
   
 (example)  
 SCLK-----GPIO #14  
