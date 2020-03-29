@@ -12,6 +12,8 @@ import  machine
 import random
 
 
+win_cnt =0
+
 upside_down = False
 Pixel_pos_pre = 28
 Pixel_pos_init = 28
@@ -33,6 +35,17 @@ Color_BK = 0x000000
 Color_RedPink = 0xFF1644
 Color_DeepPink = 0xFF198C
 Color_Random = 0x000000
+
+
+
+# offset calibration
+def buttonB_wasPressed():
+  # global params
+  global ACC_X_offset,ACC_Y_offset,ACC_Z_offset
+  ACC_X_offset = imu0.acceleration[0]
+  ACC_Y_offset = imu0.acceleration[1]
+  ACC_Z_offset = imu0.acceleration[2]
+  pass
 
 
 def get_bmm150_status():
@@ -112,6 +125,24 @@ def win_flag():
       wait(0.25)
       neopixel0.setColorFrom(1, 64, 0x000000)
       pass
+    
+def win_5():
+    global Pixel_brightness_dk,Pixel_brightness
+    #clear
+    neopixel0.setColorFrom(1, 64, 0x000000)
+    wait(0.05)
+    neopixel0.setBrightness(Pixel_brightness_dk)
+    neopixel0.setColorFrom(1, 64, Color_Green)
+    Pixel_brightness = Pixel_brightness_dk
+    while(Pixel_brightness<100):
+      neopixel0.setBrightness(Pixel_brightness)
+      Pixel_brightness = Pixel_brightness+2
+      wait(0.05)
+      
+    Pixel_brightness =30
+    wait(0.25)
+    neopixel0.setBrightness(Pixel_brightness)
+    pass
       
 def pixel_row_col_update(Pixel_pos):
     global Pixel_row_num, Pixel_col_num
@@ -163,7 +194,9 @@ def pixel_draw(pos, color):
       neopixel0.setColor(pos, color)
       wait(0.05)
       pass
-
+ACC_X_offset =0
+ACC_Y_offset =0
+ACC_Z_offset =0
 run_cnt = 0
 setScreenColor(0x111111)
 neopixel0 = unit.get(unit.NEOPIXEL, unit.PORTB, 64)
@@ -279,6 +312,9 @@ while True:
       
       
       if Pixel_pos == Pixel_target_index:
+             win_cnt = win_cnt +1
+             if (win_cnt > 5):
+                 win_5()
              label_pixel.setText("Pixel: "+str(Pixel_pos)+" Col:"+str(Pixel_col_num)+ "Target:"+str(Pixel_target_index))
              speaker.sing(660, 1)
              wait(0.15)
@@ -298,7 +334,9 @@ while True:
              Color_Random = int(random.randint(0x1F, 0xffffff))
              pixel_draw(Pixel_target_index, Color_Random)
              wait(0.25)
-         
+      #Btn B: reset acc value
+      if btnB.isPressed():
+         buttonB_wasPressed() 
       gc.collect()
       label_pixel.setText("Pixel: " + str(Pixel_pos)+ " Col:" + str(Pixel_col_num) +" Row:" + str(Pixel_row_num) + "Target:"+str(Pixel_target_index))
       label_sys.setText("Free HEAP: "+str(gc.mem_free())+" Bytes" )
