@@ -62,7 +62,7 @@ private:
 
 public:
   //ESP32_SSD1331(uint8_t sck, uint8_t miso, uint8_t mosi, uint8_t cs, uint8_t dc, uint8_t rst);
-  ESP32_SSD1331(uint8_t sck, uint8_t miso, uint8_t mosi, uint8_t cs, uint8_t dc, uint8_t rst,uint32_t freq);
+  ESP32_SSD1331(uint8_t sck, uint8_t miso, uint8_t mosi, uint8_t cs, uint8_t dc, uint8_t rst,uint32_t freq=6000000);
   void SSD1331_Init();
   void SSD1331_Init(bool bl, uint8_t cs1, uint8_t cs2, uint8_t cs3);
   void CommandWrite(uint8_t b);
