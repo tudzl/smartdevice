@@ -4,6 +4,7 @@
     Problem list： To add WiFiMQTTManager.h( related esp8266 lib is problemmatic!
     TO DO TASK:  3. ESP32-->PIC UART communication! 4. Max30205 limit alert setting function
     Doing now: 3.ESP32-->PIC UART communication
+    Version 10.1 add NTP: 0.cn.pool.ntp.org
     Version 10.0 add ssd1331 0.95 RGB OLED（0.95 cost 59 RMB, 1.5 zoll 128*128 cost 89 @2020 Taobao)
     Version 9.2 IMU using Madgwick filter, faster
     Version 9.1 improve wifi connection, add config_num_alt
@@ -112,7 +113,7 @@
 
 #include "LPS35HW.h"
 
-
+#include "time.h"
 
 
 //device MAC: 24:6f:28:f3:a3:a4
@@ -136,6 +137,16 @@ uint16_t PIC_frameend = 0xFF90;
 bool Serial_silent_mode = false;
 uint8_t PIC_Rpt_cnt = 0;
 uint8_t PIC_msg_buf = 0;
+
+//ntp time server
+
+//const char* ntpServer1 = "0.cn.pool.ntp.org";
+const char* ntpServer = "pool.ntp.org";
+const int   daylightOffset_sec = 3600;
+#define time_zone_offset_hour 7
+const long  gmtOffset_sec = time_zone_offset_hour*daylightOffset_sec;
+
+
 
 
 //OLED SPI pin def for smartdevice PCB v2
@@ -1019,7 +1030,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(BLUE, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg_status );
+      display.setCursor(1, H_msg_status );
       display.print("BH1750 init OK");
 
     }
@@ -1038,7 +1049,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(ORANGE, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg2_status );
+      display.setCursor(1, H_msg2_status );
       display.print("MLX90614 init OK");
 
     }
@@ -1106,7 +1117,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(YELLOW, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg_status );
+      display.setCursor(1, H_msg_status );
       display.print("MAX44009 init OK");
 
     }
@@ -1135,7 +1146,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(ForestGreen, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg2_status );
+      display.setCursor(1, H_msg2_status );
       display.print("BME280 init OK");
 
     }
@@ -1187,7 +1198,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(PINK, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg0_status );
+      display.setCursor(1, H_msg0_status );
       display.print("LPS33HW init OK");
 
     }
@@ -1228,7 +1239,7 @@ void setup() {
       if (OLED_HWSPI_EN) {
         display.setTextColor(ForestGreen, BLACK); //textcolor and bg color
         display.setTextSize(0);
-        display.setCursor(0, H_msg2_status );
+        display.setCursor(1, H_msg2_status );
         display.print("ICM20948 init OK");
 
       }
@@ -1274,7 +1285,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(YELLOW, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg2_status );
+      display.setCursor(1, H_msg2_status );
       display.print("MAX30205 init OK");
 
     }
@@ -1290,8 +1301,8 @@ void setup() {
   if (OLED_HWSPI_EN) {
     display.setTextColor(WHITE, BLACK); //textcolor and bg color
     display.setTextSize(0);
-    display.setCursor(0, H_wifi_status );
-    display.printf("Sensor cnt:%d!",dev_cnt);
+    display.setCursor(1, H_wifi_status );
+    display.printf("Sensor cnt:%d!", dev_cnt);
 
   }
 
@@ -1348,7 +1359,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(YELLOW, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_debug_status );
+      display.setCursor(1, H_debug_status );
       display.print("wifi setup OK");
 
     }
@@ -1360,20 +1371,34 @@ void setup() {
   if (wifi_ok) {
     if (!client.connected()) {
       MQTT_reconnect();
+      //get time
+      uint16_t ttt = millis();
+      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+      //show time
+      printLocalTime();
+      ttt = millis() - ttt;
+      Serial.printf("From NTP  server get time cost: %d ms\r\n", ttt);
 
     }
   }
   //client.loop();
   Serial.printf("MQTT status: %d (0 means MQTT_CONNECTED )\r\n", client.state());
   if (OLED_HWSPI_EN) {
-    display.drawRect(0, 0, display.width(), display.height() , Gainsboro);
+    //display.drawRect(0, 0, display.width(), display.height() , Gainsboro);
     display.setTextColor(YELLOW, BLACK); //textcolor and bg color
     display.setTextSize(0);
-    display.setCursor(0, H_sys_status );
+    display.setCursor(1, H_wifi_status );
     if (client.state() == 0)
       display.print("MQTT connected!");
     else
       display.print("MQTT setup failed");
+
+    display.setCursor(1, H_sys_status );
+    display.setTextColor(Violet, BLACK); //textcolor and bg color
+    struct tm timeinfo;
+    getLocalTime(&timeinfo);
+    display.print(&timeinfo, "%d.%B, %H:%M ");
+    display.drawRect(0, 0, display.width(), display.height() , Gainsboro);
   }
 
 
@@ -1481,14 +1506,17 @@ void loop() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(ORANGE, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg0_status );
+      display.setCursor(1, H_msg0_status );
       display.printf("T:%.2f,", temperature, hum);
       display.setTextColor(GREEN, BLACK); //textcolor and bg color
-      display.setCursor(OLED_width/2+3, H_msg0_status );
-      display.printf("H:%.1f%", temperature, hum);
-      display.setCursor(0, H_msg_status );
+      display.setCursor(OLED_width / 2 + 2, H_msg0_status );
+      display.printf("H:%.1f%  ", temperature, hum);
+      display.setCursor(1, H_msg_status );
       display.setTextColor(PINK, BLACK); //textcolor and bg color
-      display.printf("AP:%.1f hpa\r\nAT:%.1fM", pressure, filter_val);
+      display.printf("AP:%.1f hpa  \r\n", pressure, filter_val);
+      display.setCursor(1, H_msg2_status );
+      display.setTextColor(Lilac, BLACK); //textcolor and bg color
+      display.printf("AT:%.1fM      ", pressure, filter_val);
 
     }
 
@@ -1665,8 +1693,8 @@ void loop() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(RED, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(0, H_msg3_status );
-      display.printf("IR Obj T:%.2f C", T_MLX_obj);
+      display.setCursor(1, H_msg3_status );
+      display.printf("IR ObjT:%.2f C", T_MLX_obj);
 
     }
 
@@ -1852,7 +1880,15 @@ void loop() {
 
 
     }
+    //update time
 
+    if (OLED_HWSPI_EN) {
+      display.setCursor(1, H_sys_status );
+      display.setTextColor(Violet, BLACK); //textcolor and bg color
+      struct tm timeinfo;
+      getLocalTime(&timeinfo);
+      display.print(&timeinfo, "%d.%B, %H:%M ");
+    }
   }
   //  //get motion sensor offsets
   //  if (2 == run_cnt)
@@ -2645,6 +2681,41 @@ void ShowMFRC522Details() {
   }
 }
 
+//************************************NTP ***********************************
+
+void printLocalTime() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+  Serial.print("Day of week: ");
+  Serial.println(&timeinfo, "%A");
+  Serial.print("Month: ");
+  Serial.println(&timeinfo, "%B");
+  Serial.print("Day of Month: ");
+  Serial.println(&timeinfo, "%d");
+  Serial.print("Year: ");
+  Serial.println(&timeinfo, "%Y");
+  Serial.print("Hour: ");
+  Serial.println(&timeinfo, "%H");
+  Serial.print("Hour (12 hour format): ");
+  Serial.println(&timeinfo, "%I");
+  Serial.print("Minute: ");
+  Serial.println(&timeinfo, "%M");
+  Serial.print("Second: ");
+  Serial.println(&timeinfo, "%S");
+
+  Serial.println("Time variables");
+  char timeHour[3];
+  strftime(timeHour, 3, "%H", &timeinfo);
+  Serial.println(timeHour);
+  char timeWeekDay[10];
+  strftime(timeWeekDay, 10, "%A", &timeinfo);
+  Serial.println(timeWeekDay);
+  Serial.println();
+}
 
 /**************************************************************************/
 
