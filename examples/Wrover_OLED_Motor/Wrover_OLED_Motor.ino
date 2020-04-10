@@ -194,11 +194,13 @@ void loop() {
   Serial.printf("loop %d,time cost: %d ms\r\n", run_cnt, tt);
 
 
-  delay(2);
+  //delay(2);
 }
 
 
-void motor_run_CW(uint16_t delay_time) {
+
+//4 phase
+void motor_run_4CW(uint16_t delay_time) {
 
 
   //正转：
@@ -231,6 +233,76 @@ void motor_run_CW(uint16_t delay_time) {
   delay(delay_time);
   //step4
   digitalWrite(OUT1, LOW);
+  digitalWrite(OUT2, LOW);
+  digitalWrite(OUT3, LOW);
+  digitalWrite(OUT4, HIGH);
+  delay(delay_time);
+
+}
+
+
+//8 phase
+void motor_run_CW(uint16_t delay_time) {
+
+
+  //正转：
+  //（1）四拍：A 1000，A- 0010,B 0100,B- 0001.
+  //（2）八拍：A 1000，AA- 1010,A- 0010,A-B 0110,B 0100,BB- 0101,B- 0001,B-A 1001.
+  //  digitalWrite(OUT1, LOW);
+  //  digitalWrite(OUT2, LOW);
+  //  digitalWrite(OUT3, LOW);
+  //  digitalWrite(OUT4, LOW);
+
+  if (delay_time < 1)
+    delay_time = 4;
+  //step1
+  digitalWrite(OUT1, HIGH);
+  digitalWrite(OUT2, LOW);
+  digitalWrite(OUT3, LOW);
+  digitalWrite(OUT4, LOW);
+  delay(delay_time);
+  //step2
+  digitalWrite(OUT1, HIGH);
+  digitalWrite(OUT2, LOW);
+  digitalWrite(OUT3, HIGH);
+  digitalWrite(OUT4, LOW);
+  delay(delay_time);
+    //step3
+  digitalWrite(OUT1, LOW);
+  digitalWrite(OUT2, LOW);
+  digitalWrite(OUT3, HIGH);
+  digitalWrite(OUT4, LOW);
+  delay(delay_time);
+    //step4
+    digitalWrite(OUT1, LOW);
+  digitalWrite(OUT2, HIGH);
+  digitalWrite(OUT3, HIGH);
+  digitalWrite(OUT4, LOW);
+  delay(delay_time);
+
+  //step5
+  digitalWrite(OUT1, LOW);
+  digitalWrite(OUT2, HIGH);
+  digitalWrite(OUT3, LOW);
+  digitalWrite(OUT4, LOW);
+  delay(delay_time);
+
+
+      //step6
+  digitalWrite(OUT1, LOW);
+  digitalWrite(OUT2, HIGH);
+  digitalWrite(OUT3, LOW);
+  digitalWrite(OUT4, HIGH);
+  delay(delay_time);
+    //step7
+  digitalWrite(OUT1, LOW);
+  digitalWrite(OUT2, LOW);
+  digitalWrite(OUT3, LOW);
+  digitalWrite(OUT4, HIGH);
+  delay(delay_time);
+
+  //step8
+  digitalWrite(OUT1, HIGH);
   digitalWrite(OUT2, LOW);
   digitalWrite(OUT3, LOW);
   digitalWrite(OUT4, HIGH);
