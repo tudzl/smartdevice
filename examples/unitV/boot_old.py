@@ -1,5 +1,4 @@
 # image sensor Example for unit V
-# v2.0  press BtnA to enter default QR-Scan, otherwise face detect  2020.4.26
 # v1.0 2020.2.12  zell
 # test sensor for Zeit_end = 60*1000, 60 seconds
 # Welcome to the MaixPy IDE!
@@ -64,26 +63,9 @@ GROVE_UART = machine.UART(machine.UART.UART1, 115200, 8, None, 1, timeout=1000, 
 print("##:wait for BtnA pressing for face detect...")
 time.sleep(0.5)
 if Btn_A.value() == 0 :
-   #import face
-   print("-->BtnA is pressed!") # enter boot.py code if BtnB not pressed
-   time.sleep(0.2)
-   if Btn_B.value() == 0 :
-      #import face
-      print("-->BtnB is pressed!")
-      print("QVGA image auto save demo now!")
-      time.sleep(0.2)
-      import QVGA_auto_save
-else:
    import face
-
-if (Btn_A.value() == 0 )&&(Btn_B.value() == 0 ):
-   print("-->Both A and B are pressed!")
-   print("-->System reset now!")
-   time.sleep(0.2)
-   machine.reset()
-
-
 time.sleep(0.5)
+print("-->BtnA is not pressed!")
 print("VGA sensor QR-image demo starts now!")
 
 version_info = sys.version

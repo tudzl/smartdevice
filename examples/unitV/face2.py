@@ -22,6 +22,12 @@ except:
     lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find start.jpg", lcd.WHITE, lcd.RED)
 '''
 
+print("Face 2 test")
+time.sleep(0.5)
+import machine
+print("machine.reset")
+time.sleep(0.1)
+machine.reset()
 from Maix import I2S, GPIO
 import audio
 
