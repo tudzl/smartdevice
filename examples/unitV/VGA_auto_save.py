@@ -97,25 +97,42 @@ def RGB_LED_RED():
 def findMaxIDinDir(dirname):
     larNum = -1
     try:
+        print(str( dirname))
         dirList = uos.listdir(dirname)
+        print (dirList)
         for fileName in dirList:
             currNum = int(fileName.split(".jpg")[0])
             if currNum > larNum:
                 larNum = currNum
         return larNum
     except:
+        print(":failed to findMaxIDinDir")
         return -1
 
+# findMaxBMP_IDinDir works!
 def findMaxBMP_IDinDir(dirname):
+    gc.collect()
     larNum = -1
+    print(":findMaxBMP_IDinDir")
     try:
-        dirList = uos.listdir(dirname)
+        print(str( dirname))
+        #print(uos.listdir(dirname)) #ok
+        #print (uos.listdir('rawautosave') ) #ok
+        dirList = uos.listdir(dirname) #fails?
+        print (dirList)
         for fileName in dirList:
-            currNum = int(fileName.split(".bmp")[0])
+            tmp_str= fileName.split(".bmp")[0]
+            tmp_str_m=tmp_str.split("OV7740_")[1]
+            tmp_str_l=tmp_str_m.split("_")[1]
+            currNum = int(tmp_str_l)
             if currNum > larNum:
                 larNum = currNum
+        print(str( tmp_str))
+        print(str( tmp_str_m))
+        print(str( tmp_str_l))
         return larNum
     except:
+        print(":failed to findMaxBMP_IDinDir")
         return -1
 
 
@@ -180,7 +197,7 @@ currentDirectory = 1
 if (TF_Card_OK == True):
     try:
          #currentImage = max(findMaxIDinDir("/sd/train/" + str(currentDirectory)), findMaxIDinDir("/sd/vaild/" + str(currentDirectory))) + 1
-         currentImage = findMaxIDinDir("/sd/train/")+1
+         currentImage = findMaxIDinDir("/sd/train")+1
          print("------------------")
          print("##: Current image file index: "+str(currentImage))
          print("------------------")
@@ -318,3 +335,18 @@ if(MJPG_mode):
     #movie.close(clock.fps())
 print("#:Total auto saved images: "+str(autosave_cnt))
 print("#:Total running time: "+str((time.ticks_ms()-Zeit_Anfang)/1000   )+" s")
+"""
+def startup(timer=None):
+    conf = Config('global')
+    for app in uos.listdir('/apps'):
+        try:
+            uos.stat('/apps/{}/boot.py'.format(app))
+        except OSError:
+            pass
+        else:
+            execfile('/apps/{}/boot.py'.format(app))
+            gc.collect()
+    del conf
+    gc.collect()
+
+"""
