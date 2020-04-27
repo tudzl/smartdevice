@@ -1,4 +1,5 @@
 #UnitV boot.py  facedetect demo
+#V1.2  2020.4.27
 #Version 1.1 by Zell  tudzl@hotmail.de
 #Image FPS: 19.02748 @ IDE monitor mode with OV7740
 #import lcd
@@ -206,7 +207,7 @@ try:
                 RGB_LED_PURPLE()
                 Zeit_jetzt= time.ticks_ms()/1000
                 img.draw_string(2,2, ("%2.1f FPS" %(fps)), color=(192,192,192), scale=2)#draw fps to real time image,scale is the text size
-                img.save("/sd/autosave/face" +str(autosave_cnt)+ str(Zeit_jetzt/1000) + ".bmp")
+                img.save("/sd/autosave/face_" +str(Zeit_jetzt//1000)+"_"+  str(autosave_cnt)+  ".bmp")
                 print(">=3 face found, image saved to /sd/autosave/face" +str(autosave_cnt)+ str(Zeit_jetzt/1000) + ".bmp")
                 time.sleep(0.2)
             if  face_duration_cnt > 10:
