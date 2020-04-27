@@ -1,4 +1,5 @@
 # image sensor Example for unit V
+# v2.0 autosave 2020.4.26 Zell
 # v1.0 2020.2.12  zell
 # test sensor for Zeit_end = 60*1000, 60 seconds
 # Welcome to the MaixPy IDE!
@@ -229,7 +230,7 @@ sensor.set_pixformat(sensor.RGB565) # Set pixel format to RGB565 (or GRAYSCALE)
 #sensor.set_hmirror(1)#for unit V  #bugs??
 #sensor.set_vflip(1)#for unit V
 #sensor.set_framesize(sensor.VGA)  # out of mem
-sensor.set_framesize(sensor.QVGA)
+sensor.set_framesize(sensor.VGA)
 img_w = sensor.width()
 img_h = sensor.height()
 
@@ -247,16 +248,27 @@ fps=0
 Zeit_interval = 10 #10s
 Zeit_passed = Zeit_Anfang
 autosave_cnt =0
+#img_roi= (80,60,480,360)
+img_roi = (80,60,200,160)
+#foto= sensor.alloc_extra_fb(200, 160, sensor.RGB565)
+#roi_img = sensor.alloc_extra_fb(roi_w, roi_h, sensor.RGB565)
+#img.copy((roi_ul_x, roi_ul_y, roi_src_w, roi_src_h), x_scale=roi_scale, y_scale=roi_scale, copy_to_fb=roi_img)
 while(condition):
     clock.tick()                    # Update the FPS clock.
     Zeit_jetzt=time.ticks_ms()      # get millisecond counter
     img = sensor.snapshot()         # Take a picture and return the image.
-
+    #foto = img.copy(copy_to_fb = True)
+    #foto = img.copy(img_roi)
+    #foto = img.copy(copy_to_fb = True)
     if auto_save:
        Zeit_tmp = time.ticks_ms()- Zeit_passed
        if (Zeit_tmp > Zeit_interval*1000):
          if TF_Card_OK:
-            img.save("/sd/autosave/" + str(sensor_ID_str)+"_s"+str(Zeit_jetzt/1000) + ".jpg", quality=95)
+            gc.collect()
+            foto = img.copy(copy_to_fb = True) #GC free mem: 177.632KB/ 500K for QVGA without/with copy_to_fb
+            #foto = img.copy(img_roi,1,1,copy_to_fb = True) #GC free mem: 177.632KB for QVGA
+            print("GC free mem: "+ str(gc.mem_free()/1000)+"KB")
+            foto.save("/sd/autosave/" + str(sensor_ID_str)+"_s"+str(Zeit_jetzt/1000) + ".jpg", quality=95)
             time.sleep(0.2)
             autosave_cnt = autosave_cnt+1
             print("---------------------------")
@@ -265,7 +277,7 @@ while(condition):
             Zeit_passed = time.ticks_ms()
 
 
-    img.draw_string(2,2, ("%2.1f FPS" %(fps)), color=(192,192,192), scale=2)#draw fps to real time image,scale is the text size
+    #img.draw_string(2,2, ("%2.1f FPS" %(fps)), color=(192,192,192), scale=2)#draw fps to real time image,scale is the text size
     #lcd.display(img)               # Display on LCD
 
 

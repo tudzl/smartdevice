@@ -25,11 +25,11 @@ import uos
 from modules import ws2812
 from fpioa_manager import *
 from Maix import GPIO
+import utime
 
 
-
-
-
+print("UnitV boot.py starts")
+utime.localtime()
 print("GROVE port GND, VCC_5V, G35,G34 function: UART1")
 #UnitV btns
 #Btn A, capature image
@@ -63,28 +63,35 @@ GROVE_UART = machine.UART(machine.UART.UART1, 115200, 8, None, 1, timeout=1000, 
 
 print("##:wait for BtnA pressing for face detect...")
 time.sleep(0.5)
-if Btn_A.value() == 0 :
-   #import face
-   print("-->BtnA is pressed!") # enter boot.py code if BtnB not pressed
-   time.sleep(0.2)
-   if Btn_B.value() == 0 :
-      #import face
-      print("-->BtnB is pressed!")
-      print("QVGA image auto save demo now!")
-      time.sleep(0.2)
-      import QVGA_auto_save
-else:
-   import face
 
-if (Btn_A.value() == 0 )&&(Btn_B.value() == 0 ):
+
+if ((Btn_A.value() == 0 )and(Btn_B.value() == 0 )):
    print("-->Both A and B are pressed!")
    print("-->System reset now!")
    time.sleep(0.2)
    machine.reset()
 
 
+
+if Btn_A.value() == 0 :
+   #import face
+   print("-->BtnA is pressed!") # enter boot.py code if BtnB not pressed
+   time.sleep(0.2)
+elif Btn_B.value() == 0 :
+      #import face
+      print("-->BtnB is pressed!")
+      print("VGA image auto save demo now!")
+      time.sleep(0.2)
+      import VGA_auto_save
+else:
+   import face
+
+isButtonPressedA = 0
+isButtonPressedB = 0
+
+
 time.sleep(0.5)
-print("VGA sensor QR-image demo starts now!")
+print("VGA sensor QR-image demo starts now(boot.py)!")
 
 version_info = sys.version
 QR_detect = False
@@ -138,7 +145,17 @@ def RGB_LED_LightGreen(): # run indication
                 PIXEL_LED = class_ws2812.set_led(0,(0,0,0))
                 PIXEL_LED = class_ws2812.display()
 
-
+def findMaxIDinDir(dirname):
+    larNum = -1
+    try:
+        dirList = uos.listdir(dirname)
+        for fileName in dirList:
+            currNum = int(fileName.split(".jpg")[0])
+            if currNum > larNum:
+                larNum = currNum
+        return larNum
+    except:
+        return -1
 
 
 
@@ -221,18 +238,20 @@ if (TF_Card_OK == True):
 
 if OV77XX_EN:
     #sensor.reset(freq=20000000, set_regs=True, dual_buff=False) #OV7740  Loop Time :155ms, run fps:6.451613
-    sensor.reset(freq=20000000, set_regs=True, dual_buff=True) #OV7740  Loop Time :91ms, run fps:10.98901
+    sensor.reset(freq=20000000, dual_buff=True) #OV7740  Loop Time :91ms, run fps:10.98901
     #sensor.reset(freq=20000000)
 else:
     sensor.reset()                  # OV2640 Reset and initialize the sensor. It will
                                     # run automatically, call sensor.run(0) to stop
 #sensor.shutdown(enable)
+
 sensor.set_pixformat(sensor.RGB565) # Set pixel format to RGB565 (or GRAYSCALE)
+sensor.set_framesize(sensor.VGA)
 #sensor.set_framesize(sensor.QVGA)   # Set frame size to QVGA (320x240)
 #sensor.set_auto_whitebal(True)  #OV2640
 sensor.set_hmirror(1)#for unit V
 sensor.set_vflip(1)#for unit V
-sensor.set_framesize(sensor.VGA)
+
 img_w = sensor.width()
 img_h = sensor.height()
 sensor_ID = sensor.get_id()
@@ -283,7 +302,7 @@ while(condition):
     if Btn_A.value() == 0 and isButtonPressedA == 0:
                 RGB_LED_ORANGE()
                 if TF_Card_OK:
-                    img.save("/sd/train/" + str(sensor_ID)+ str(currentImage)+"_s"+str(Zeit_jetzt/1000) + ".jpg", quality=95)
+                    img.save("/sd/train/" + str(sensor_ID)+ str(currentImage)+"_s"+str(Zeit_jetzt/1000) + ".bmp", )
                     #img_roi = (80,80,480,320)
                     #img.save("/sd/train/" + str(sensor_ID)+ str(currentImage)+"_s"+str(Zeit_jetzt/1000) + ".bmp")
                     #img.save("/sd/train/" + str(sensor_ID)+ str(currentImage)+"_s"+str(Zeit_jetzt/1000) + ".jpg", roi=img_roi, quality=95)
@@ -292,7 +311,7 @@ while(condition):
                     print("---------------------------")
                     currentImage = currentImage + 1
                     time.sleep(0.2)
-                QR_detect = True
+                #QR_detect = True
     if Btn_A.value() == 1:
                 isButtonPressedA = 0
     if Btn_B.value() == 0 and isButtonPressedB == 0:
