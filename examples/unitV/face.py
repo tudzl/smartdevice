@@ -23,8 +23,8 @@ except:
     lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find start.jpg", lcd.WHITE, lcd.RED)
 '''
 
-from Maix import I2S, GPIO
-import audio
+#from Maix import I2S, GPIO
+#import audio
 
 
 OV77XX_EN = True
@@ -43,33 +43,41 @@ Color_Blue = 0xE0
 # UNIT V RGB Pixel LED
 PIXEL_LED_pin = 8
 PIXEL_LED_num = 1
-PIXEL_LED = class_ws2812 = ws2812(PIXEL_LED_pin,PIXEL_LED_num)
+#PIXEL_LED = class_ws2812 = ws2812(PIXEL_LED_pin,PIXEL_LED_num)
+PIXEL_LED = ws2812(PIXEL_LED_pin,PIXEL_LED_num)
 
 
 
 def RGB_LED_RED():
     #class_ws2812.set_led(num,color), color` : 该灯珠赋值的颜色，为 `tuple` 类型， （R,G,B）
-    PIXEL_LED = class_ws2812.set_led(0,(Color_Red,0,0))
-    PIXEL_LED = class_ws2812.display()
+    PIXEL_LED.set_led(0,(Color_Red,0,0))
+    PIXEL_LED.display()
+    #PIXEL_LED.del()
     time.sleep(0.01)
-    #PIXEL_LED = class_ws2812.set_led(0,(0,0,0))
-    #PIXEL_LED = class_ws2812.display()
+    #PIXEL_LED.set_led(0,(0,0,0))
+    #PIXEL_LED.display()
+def RGB_LED_RED_DK():
+        #class_ws2812.set_led(num,color), color` : 该灯珠赋值的颜色，为 `tuple` 类型， （R,G,B）
+        PIXEL_LED.set_led(0,(Color_Red/10,0,0))
+        PIXEL_LED.display()
+        time.sleep(0.01)
+
 
 def RGB_LED_GREEN():
     #class_ws2812.set_led(num,color), color` : 该灯珠赋值的颜色，为 `tuple` 类型， （R,G,B）
-    PIXEL_LED = class_ws2812.set_led(0,(0,Color_Green,0))
-    PIXEL_LED = class_ws2812.display()
+    PIXEL_LED.set_led(0,(0,Color_Green,0))
+    PIXEL_LED.display()
     #time.sleep(0.03)
-    #PIXEL_LED = class_ws2812.set_led(0,(0,0,0))
-    #PIXEL_LED = class_ws2812.display()
+    #PIXEL_LED.set_led(0,(0,0,0))
+    #PIXEL_LED.display()
 def RGB_LED_PURPLE():
         #class_ws2812.set_led(num,color), color` : 该灯珠赋值的颜色，为 `tuple` 类型， （R,G,B）
-        PIXEL_LED = class_ws2812.set_led(0,(Color_Red,0,Color_Blue))
-        PIXEL_LED = class_ws2812.display()
+        PIXEL_LED.set_led(0,(Color_Red,0,Color_Blue))
+        PIXEL_LED.display()
 
 def RGB_LED_OFF():
-    PIXEL_LED = class_ws2812.set_led(0,(0,0,0))
-    PIXEL_LED = class_ws2812.display()
+    PIXEL_LED.set_led(0,(0,0,0))
+    PIXEL_LED.display()
 
 '''
 fm.register(board_info.SPK_SD, fm.fpioa.GPIO0)
@@ -104,7 +112,7 @@ print("python version:"+version_info)
 #freq.set(400,400)
 print("CPU freq:"+str(freq.get_cpu()))
 print("KPU freq:"+str(freq.get_kpu()))
-print("UnitV facedetect demo v1.1 by Zell, 24.04.2020")
+print("UnitV facedetect demo v1.1 by Zell, 27.04.2020")
 print("GROVE port GND, VCC_5V, G35,G34 function: NA")
 print("UnitV Btn_A and Btn_B init.")
 #UnitV btns
@@ -138,7 +146,7 @@ while 1:
         if OV77XX_EN:
             #sensor.reset(freq=20000000, set_regs=True, dual_buff=False) #OV7740
             sensor.reset(freq=20000000, set_regs=True, dual_buff=True) #OV7740
-            RGB_LED_RED()
+            RGB_LED_RED_DK()
             #time.sleep(0.1)
         else:
             sensor.reset()                  # OV2640 Reset and initialize the sensor. It will
