@@ -1,5 +1,5 @@
 #UnitV boot.py  facedetect demo
-#V1.2  2020.4.27
+#Version 1.2 improved code, 2020.4.26, 32FPS @ serial terminal mode!
 #Version 1.1 by Zell  tudzl@hotmail.de
 #Image FPS: 19.02748 @ IDE monitor mode with OV7740
 #import lcd
@@ -25,7 +25,6 @@ except:
 
 #from Maix import I2S, GPIO
 #import audio
-
 
 OV77XX_EN = True
 Sensor_img_flip =True
@@ -57,10 +56,9 @@ def RGB_LED_RED():
     #PIXEL_LED.set_led(0,(0,0,0))
     #PIXEL_LED.display()
 def RGB_LED_RED_DK():
-        #class_ws2812.set_led(num,color), color` : 该灯珠赋值的颜色，为 `tuple` 类型， （R,G,B）
-        PIXEL_LED.set_led(0,(Color_Red/10,0,0))
-        PIXEL_LED.display()
-        time.sleep(0.01)
+    PIXEL_LED.set_led(0,(Color_Red>>4,0,0))
+    PIXEL_LED.display()
+    time.sleep(0.01)
 
 
 def RGB_LED_GREEN():
@@ -83,13 +81,10 @@ def RGB_LED_OFF():
 fm.register(board_info.SPK_SD, fm.fpioa.GPIO0)
 spk_sd=GPIO(GPIO.GPIO0, GPIO.OUT)
 spk_sd.value(1) #Enable the SPK output
-
 fm.register(board_info.SPK_DIN,fm.fpioa.I2S0_OUT_D1)
 fm.register(board_info.SPK_BCLK,fm.fpioa.I2S0_SCLK)
 fm.register(board_info.SPK_LRCLK,fm.fpioa.I2S0_WS)
-
 wav_dev = I2S(I2S.DEVICE_0)
-
 try:
     player = audio.Audio(path = "/flash/ding.wav")
     player.volume(100)
@@ -185,6 +180,7 @@ autosave_cnt =0
 face_duration_cnt = 0
 clock = time.clock()
 gc.collect()
+RGB_LED_OFF()
 try:
     while(True):
         clock.tick()
