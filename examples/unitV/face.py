@@ -212,16 +212,18 @@ try:
                 RGB_LED_PURPLE()
                 Zeit_jetzt= time.ticks_ms()/1000
                 img.draw_string(2,2, ("%2.1f FPS" %(fps)), color=(192,192,192), scale=2)#draw fps to real time image,scale is the text size
-                img.save("/sd/autosave/face_" +str(Zeit_jetzt//1000)+"_"+  str(autosave_cnt)+  ".bmp")
+                img.save("/sd/autosave/face2_" +str(Zeit_jetzt//1000)+"_"+  str(autosave_cnt)+  ".bmp")
                 print(">=3 face found, image saved to /sd/autosave/face" +str(autosave_cnt)+ str(Zeit_jetzt/1000) + ".bmp")
                 time.sleep(0.2)
+                autosave_cnt=autosave_cnt+1
             if  face_duration_cnt > 10:
                     RGB_LED_PURPLE()
                     Zeit_jetzt= time.ticks_ms()/1000
                     img.draw_string(2,2, ("%2.1f FPS" %(fps)), color=(192,192,192), scale=2)#draw fps to real time image,scale is the text size
-                    img.save("/sd/autosave/face" +str(autosave_cnt)+ str(Zeit_jetzt/1000) + ".bmp")
+                    img.save("/sd/autosave/face3_" +str(Zeit_jetzt//1000)+"_"+  str(autosave_cnt)+ ".bmp")
                     print("Face long time found, image saved to /sd/autosave/face" +str(autosave_cnt)+ str(Zeit_jetzt/1000) + ".bmp")
                     time.sleep(0.2)
+                    autosave_cnt=autosave_cnt+1
                     RGB_LED_GREEN()
 
 
