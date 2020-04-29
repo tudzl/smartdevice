@@ -57,10 +57,10 @@ isButtonPressedB = 0
 
 
 # UNIT V RGB Pixel LED
-"""
+
 PIXEL_LED_pin = 8
 PIXEL_LED_num = 1
-PIXEL_LED = class_ws2812 = ws2812(PIXEL_LED_pin,PIXEL_LED_num)
+PIXEL_LED = ws2812(PIXEL_LED_pin,PIXEL_LED_num)
 Color_Green = 0xE0
 Color_Green_half =0x80
 Color_Green_min =0x40
@@ -83,9 +83,18 @@ def RGB_LED_RED():
     PIXEL_LED = class_ws2812.set_led(0,(0,0,0))
     PIXEL_LED = class_ws2812.display()
 
-"""
+def RGB_LED_PURPLE():
+        #class_ws2812.set_led(num,color), color` : 该灯珠赋值的颜色，为 `tuple` 类型， （R,G,B）
+        PIXEL_LED.set_led(0,(Color_Red,0,Color_Blue))
+        PIXEL_LED.display()
+def RGB_LED_BLUE2():
+        #class_ws2812.set_led(num,color), color` : 该灯珠赋值的颜色，为 `tuple` 类型， （R,G,B）
+        PIXEL_LED.set_led(0,(0,Color_Green_min,Color_Blue>>2))
+        PIXEL_LED.display()
 
-
+def RGB_LED_OFF():
+    PIXEL_LED.set_led(0,(0,0,0))
+    PIXEL_LED.display()
 
 
 #kpu_freqlist = cpufreq.set_frequency(cpu = cpu_freq, kpu = kpu_freq)
@@ -213,6 +222,7 @@ if (TF_Card_OK == True):
               print("------------------")
               print("##: Current raw auto save file index: "+str(autosave_cnt))
               print("------------------")
+              RGB_LED_PURPLE()
               time.sleep(0.5)
 
     except:
@@ -297,9 +307,11 @@ Zeit_passed = Zeit_Anfang
 #autosave_cnt =0
 print("#->: VGA sensor auto save code starts now! Press Btn_B to exit auto save mode")
 time.sleep(0.5)
+RGB_LED_OFF()
 while(condition):
     clock.tick()                    # Update the FPS clock.
     Zeit_jetzt=time.ticks_ms()      # get millisecond counter
+    RGB_LED_OFF()
     img = sensor.snapshot()         # Take a picture and return the image.
 
     if auto_save:
@@ -314,6 +326,7 @@ while(condition):
             if(MJPG_mode):
                 movie.add_frame(img)
             else:
+                RGB_LED_PURPLE()
                 img.save("/sd/rawautosave/OV7740_" +str(Zeit_jetzt//1000)+"_"+  str(autosave_cnt)+ ".bmp")
             time.sleep(0.2)
             autosave_cnt = autosave_cnt+1
@@ -330,11 +343,18 @@ while(condition):
     print("Img FPS: "+str(clock.fps()) )              # Note: MaixPy's Cam runs about half as fast when connected
 
 #----ends---------------
+
+
 if(MJPG_mode):
     movie.close()
     #movie.close(clock.fps())
 print("#:Total auto saved images: "+str(autosave_cnt))
 print("#:Total running time: "+str((time.ticks_ms()-Zeit_Anfang)/1000   )+" s")
+while(1)
+   RGB_LED_OFF()
+   time.sleep(0.5)
+   RGB_LED_BLUE2()
+   time.sleep(0.5)
 """
 def startup(timer=None):
     conf = Config('global')

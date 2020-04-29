@@ -150,6 +150,7 @@ while 1:
         err_counter = err_counter + 1
         if err_counter == 20:
             print("Error: Sensor Init Failed")
+            sys.exit()
             #lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Sensor Init Failed", lcd.WHITE, lcd.RED)
         time.sleep(0.1)
         continue
