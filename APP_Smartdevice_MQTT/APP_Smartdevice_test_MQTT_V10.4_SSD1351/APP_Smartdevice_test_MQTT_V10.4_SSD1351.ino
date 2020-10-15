@@ -4,7 +4,7 @@
     Problem list： To add WiFiMQTTManager.h( related esp8266 lib is problemmatic!
     TO DO TASK:  3. ESP32-->PIC UART communication! 4. Max30205 limit alert setting function
     Doing now: 3.ESP32-->PIC UART communication
-    Version 10.4 improve buttonA/S1 function, need test, 2020.10.15
+    Version 10.4 OLED GUI improve,  buttonA/S1 function modified, need test, 2020.10.15
     Version 10.4 SSD1351 128*128 new GUI with mic ADC value display
     Version 10.3 improved GUI OLED status display
     Version 10.1 add NTP: 0.cn.pool.ntp.org
@@ -192,7 +192,7 @@ bool OLED_HWSPI_EN = true;
 #define PINK2           0xD57A
 #define BROWN        0XBC40 //×ØÉ«
 #define BRRED        0XFC07 //×ØºìÉ«
-#define GRAY         0X8430 //»ÒÉ«
+#define GREY         0X8430 //»ÒÉ«
 #define Rose 63503
 #define Gainsboro  57083 //gray!
 #define Maroon  57083 //Àõ×ÓºÖÉ«
@@ -639,9 +639,24 @@ void buttonA_wasPressed(void) {
 //  height_diff = height_new - height_base;
 //
 //}
+
+void Wifi_icon_display (bool status) {
+  if (status) {
+    display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 7, X_pos_wifi_icon, Y_pos_wifi_icon, GREEN);
+    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 4, X_pos_wifi_icon + 2, Y_pos_wifi_icon, GREEN);
+    display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 2, X_pos_wifi_icon + 4, Y_pos_wifi_icon, GREEN);
+  }
+  else {
+    display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 6, X_pos_wifi_icon, Y_pos_wifi_icon, ORANGE);
+    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 2, Y_pos_wifi_icon, ORANGE);
+    display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 4, Y_pos_wifi_icon, LightRED);
+  }
+
+}
+
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Wifi functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //void connect_wifi() is to connect and verify the wifi ssid PW ok or not,  called in loop(), MQTT back control function ralted.
-void connect_wifi() {
+void connect_wifi(void) {
   delay(10);
 
   // We start by connecting to a WiFi network
@@ -679,9 +694,9 @@ void connect_wifi() {
     Serial.println("WiFi config set to 0 (new received configeration)!");
     writeFile(FFat, "/Wifi_config_Nr.txt", 0);
     Serial.println("WiFi config save to Wifi_config_Nr.txt !");
-    display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 7, X_pos_wifi_icon, Y_pos_wifi_icon, GREEN);
-    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 4, X_pos_wifi_icon + 2, Y_pos_wifi_icon, GREEN);
-    display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 2, X_pos_wifi_icon + 4, Y_pos_wifi_icon, GREEN);
+    //display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 7, X_pos_wifi_icon, Y_pos_wifi_icon, GREEN);
+    //display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 4, X_pos_wifi_icon + 2, Y_pos_wifi_icon, GREEN);
+    //display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 2, X_pos_wifi_icon + 4, Y_pos_wifi_icon, GREEN);
     //display.drawPixel(X_pos_wifi_icon, Y_pos_wifi_icon, GREEN);
     //display.drawPixel(X_pos_wifi_icon+1, Y_pos_wifi_icon+1, GREEN);
 
@@ -694,13 +709,10 @@ void connect_wifi() {
     //char * tmpmsg= wifi_config_num;
     writeFile(FFat, "/Wifi_config_Nr.txt", &wifi_config_num);
     Serial.printf("WiFi config restored to default setting %d !\r\n", wifi_config_num);
-    display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 6, X_pos_wifi_icon, Y_pos_wifi_icon, ORANGE);
-    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 2, Y_pos_wifi_icon, ORANGE);
-    display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 4, Y_pos_wifi_icon, LightRED);
     //display.drawPixel(X_pos_wifi_icon, Y_pos_wifi_icon, ORANGE);
     //display.drawPixel(X_pos_wifi_icon+1, Y_pos_wifi_icon+1, ORANGE);
   }
-
+  Wifi_icon_display(wifi_ok);
   Zeit = float(millis() - Zeit_anfang) / 1000.0f;
   //Zeit = Zeit/1000 ; // to S
 
@@ -710,7 +722,7 @@ void connect_wifi() {
 
 //called once after booting
 //void setup_wifi() is to connect to wifi AP for the first time after system booting, called first in the end of setup();
-void setup_wifi() {
+void setup_wifi(void) {
   delay(10);
 
   // We start by connecting to a WiFi network
@@ -776,22 +788,18 @@ void setup_wifi() {
     wifi_ok = true;
     writeFile(FFat, "/Wifi_config_Nr.txt", &wifi_config);
     Serial.printf("WiFi config restored to default setting %d !\r\n", wifi_config);
-    display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 7, X_pos_wifi_icon, Y_pos_wifi_icon, GREEN);
-    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 5, X_pos_wifi_icon + 2, Y_pos_wifi_icon, GREEN);
-    display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 2, X_pos_wifi_icon + 4, Y_pos_wifi_icon, GREEN);
+
   }
   else  {
     wifi_ok = false;
     WiFi.disconnect(true);
     //display.drawPixel(X_pos_wifi_icon, Y_pos_wifi_icon, ORANGE);
-    display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 6, X_pos_wifi_icon, Y_pos_wifi_icon, ORANGE);
-    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 2, Y_pos_wifi_icon, ORANGE);
-    display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 4, Y_pos_wifi_icon, LightRED);
+
     Serial.println("#connectting wifi failed");
     //added 2019.12.20, in case  config 0 failed( after reloaction of the device?), switch back to def config 4
     wifi_config = wifi_config_num;
   }
-
+  Wifi_icon_display(wifi_ok);
   Zeit = float(millis() - Zeit_anfang) / 1000.0f;
   //Zeit = Zeit/1000 ; // to S
 
@@ -1060,7 +1068,7 @@ void setup() {
     display.fillScreen(BLACK);
 
     display.setTextSize(1);
-    display.print("SmartDevice 2020");
+    display.print(" SmartDevice 2020");
     display.setTextColor(RED);
     display.setTextSize(0);//1 is default 6x8(height), 2 is 12x16, 3 is 18x24
     display.setCursor(0, H_sys_status);
@@ -1081,9 +1089,9 @@ void setup() {
     wifi_config = 4;
 
     if (OLED_HWSPI_EN) {
-      display.setTextColor(BLACK, WHITE);
+      display.setTextColor(WHITE, BLACK);
       display.setTextSize(1);
-      display.setCursor(0, H_wifi_status );
+      display.setCursor(1, H_wifi_status );
       display.println("BtnA->:Load Wifi set.4(2 def):");
       display.print(ssid4);
 
@@ -1123,25 +1131,31 @@ void setup() {
 
   }
 
-  if (MLX90614.begin2()) {
-    //MLX90614 chip ID readout: 0  bugs?
 
-    MLX90614_ok = true;
+  if (MAX44009_light.begin2(MAX44009_add))
+  {
     dev_cnt++;
-    //Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
-    Serial.println("* NCIR MLX90614 sensor is connected!");
-    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+    bot_light_ok = true;
+    Serial.println("* Bot light sensor Max44009 is connected!");
+    Serial.println("  Max44009 spec:  Wide 0.045 Lux to 188,000 Lux Range");
+    Serial.println("  4,000,000 to 1 dynamic range");
+    Serial.println("  -40°C to +85°C Temperature Range");
     if (OLED_HWSPI_EN) {
-      display.setTextColor(ORANGE, BLACK); //textcolor and bg color
+      display.setTextColor(LGRAYBLUE, BLACK); //textcolor and bg color
       display.setTextSize(0);
       display.setCursor(1, H_msg2_status );
-      display.print("MLX90614 init OK");
+      display.print("MAX44009 init OK");
 
     }
+    delay(50);
+
+    //Two key features of the IC analog design are its ultra-low
+    //current consumption (typically 0.65μA) and an extremely
+    //wide dynamic light range that extends from 0.045 lux to
+    //188,000 lux—more than a 4,000,000 to 1 range.
+    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
   }
-  else {
-    Serial.println("## NCIR sensor is not connected!");
-  }
+  else  Serial.println("Couldn't find Bot light sensor Max44009! Check your connections and verify the IIC address 0x4B is correct.");
 
 
   if (MCP9808.begin(MCP9808_add)) {
@@ -1185,36 +1199,19 @@ void setup() {
     Serial.printf("  MCP9808 Resolution: %d (0 to 3, 3 means 0.0625°C)\r\n", resolution);
     Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
     delay(50);
+        if (OLED_HWSPI_EN) {
+      display.setTextColor(YELLOW, BLACK); //textcolor and bg color
+      display.setTextSize(0);
+      display.setCursor(1, H_msg3_status+8 );
+      display.print("MAX30205 init OK");
+
+    }
   }
   else {
     Serial.println("Couldn't find MCP9808! Check your connections and verify the IIC address 0x19 is correct.");
   }
 
 
-  if (MAX44009_light.begin2(MAX44009_add))
-  {
-    dev_cnt++;
-    bot_light_ok = true;
-    Serial.println("* Bot light sensor Max44009 is connected!");
-    Serial.println("  Max44009 spec:  Wide 0.045 Lux to 188,000 Lux Range");
-    Serial.println("  4,000,000 to 1 dynamic range");
-    Serial.println("  -40°C to +85°C Temperature Range");
-    if (OLED_HWSPI_EN) {
-      display.setTextColor(YELLOW, BLACK); //textcolor and bg color
-      display.setTextSize(0);
-      display.setCursor(1, H_msg3_status );
-      display.print("MAX44009 init OK");
-
-    }
-    delay(50);
-
-    //Two key features of the IC analog design are its ultra-low
-    //current consumption (typically 0.65μA) and an extremely
-    //wide dynamic light range that extends from 0.045 lux to
-    //188,000 lux—more than a 4,000,000 to 1 range.
-    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
-  }
-  else  Serial.println("Couldn't find Bot light sensor Max44009! Check your connections and verify the IIC address 0x4B is correct.");
 
   if (bme280.begin(BME280_add))
   {
@@ -1231,7 +1228,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(ForestGreen, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(1, H_msg4_status );
+      display.setCursor(1, H_msg4_status - 8 );
       display.print("BME280 init OK");
 
     }
@@ -1283,7 +1280,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(PINK, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(1, H_msg0_status );
+      display.setCursor(1, H_msg4_status );
       display.print("LPS33HW init OK");
 
     }
@@ -1324,7 +1321,7 @@ void setup() {
       if (OLED_HWSPI_EN) {
         display.setTextColor(ForestGreen, BLACK); //textcolor and bg color
         display.setTextSize(0);
-        display.setCursor(1, H_msg1_status );
+        display.setCursor(1, H_msg5_status );
         display.print("ICM20948 init OK");
 
       }
@@ -1370,13 +1367,34 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(YELLOW, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(1, H_msg2_status );
+      display.setCursor(1, H_msg5_status+8 );
       display.print("MAX30205 init OK");
 
     }
 
   }
   else  Serial.println("Couldn't find body temperature sensor Max30205! Check your PCB module connections and verify the IIC address 0x49 is correct.");
+
+  if (MLX90614.begin2()) {
+    //MLX90614 chip ID readout: 0  bugs?
+
+    MLX90614_ok = true;
+    dev_cnt++;
+    //Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+    Serial.println("* NCIR MLX90614 sensor is connected!");
+    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
+    if (OLED_HWSPI_EN) {
+      display.setTextColor(ORANGE, BLACK); //textcolor and bg color
+      display.setTextSize(0);
+      display.setCursor(1, H_msg5_status+16 );
+      display.print("MLX90614 init OK");
+
+    }
+  }
+  else {
+    Serial.println("## NCIR sensor is not connected!");
+  }
+
 
   //ADC init
   Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
@@ -1500,7 +1518,7 @@ void setup() {
     struct tm timeinfo;
     getLocalTime(&timeinfo);
     display.print(&timeinfo, "%d.%B, %H:%M ");
-    display.drawRect(0, 0, display.width(), display.height() , MAGENTA);
+
   }
 
 
@@ -1521,11 +1539,13 @@ void setup() {
   if (OLED_HWSPI_EN) {
     //clear UI
     delay(100);
+    display.drawRect(0, 0, display.width(), display.height() , GREY);//frame
     display.fillRect(1, 1, display.width() - 2, display.height() - 2 , BLACK);
     display.setTextSize(1);
-    display.setCursor(2, 1);
+    display.setCursor(8, 1);
     display.print("SmartDevice 2020");
-    display.setTextColor(RED);
+    Wifi_icon_display (wifi_ok);
+    //display.setTextColor(RED);
   }
 }
 
@@ -1596,6 +1616,8 @@ void loop() {
       hum_comp = hum + BME280_Hum_comp * (temperature - T_max30205);
     else
       hum_comp = hum + BME280_Hum_offset;
+    if (hum_comp > 99) hum_comp = 99;
+    else if (hum_comp < 0) hum_comp = 0;
     pressure = (float)bme280.readPressure() / 100.0; // in hPA
     Altitude = (float)bme280.readAltitude(SEALEVELPRESSURE_HPA) ;
     Serial.printf("BME280 Temp. = %.2f°C ; Humidity= %.2f %%  ;pressure= %.2f hpa\r\n", temperature, hum, pressure);
@@ -1647,7 +1669,7 @@ void loop() {
       display.setTextSize(2);
       display.setTextColor(GREEN, BLACK); //textcolor and bg color
       display.setCursor(1, H_msg5_status + 16 );
-      display.printf("Hu:%.1f %% ", hum_comp);
+      display.printf("Hu:%.1f %%", hum_comp);
 
     }
 
