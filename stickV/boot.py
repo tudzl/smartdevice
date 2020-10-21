@@ -1,11 +1,154 @@
 # Untitled - By: ling - Tue Oct 20 2020
+# factory default boot.py file modified by ZL
 
+#version 1.1   2020.20.21
 import lcd
 import image
 import time
 import uos
+import utime
+import sys
+import gc
+import pmu
 from Maix import GPIO
 from fpioa_manager import *
+
+
+#global vars
+auto_save = False
+save_cnt = 0
+debug_print_EN = False
+QR_detect = False
+TF_Card_OK = False
+Zeit_interval = 10*1000  # 10s interval for sys info display
+#PMU vars
+filler = "          "
+axp = pmu.axp192()
+axp.enableADCs(True)
+
+version_info = sys.version
+print("python version:"+version_info)
+print(os.uname())
+print(os.listdir())
+
+
+def Foto_save(EN):
+    global save_cnt
+    Zeit_anfang = time.ticks_ms()
+    if EN:
+            print("---------------------------")
+            print("#:raw image "+str(save_cnt)+" saved to SD card!")
+
+            gc.collect()
+
+            img.save("/sd/DCIM_StickV/" +str(save_cnt)+ str(Zeit_anfang/1000) + ".bmp")
+            #time.sleep(0.2)
+            save_cnt = save_cnt+1
+
+    Zeit_passed = time.ticks_ms()-Zeit_anfang
+    print("#:Save time cost: "+str(Zeit_passed)+"ms!")
+    print("---------------------------")
+    return
+
+def show_akku_status():
+    #lcd.draw_string(0, 0, "Battery Info Develop", lcd.WHITE, lcd.BLACK)
+    #lcd.draw_string(230, 0, "*", lcd.BLUE, lcd.BLACK)
+    val = axp.getVbatVoltage()
+    #lcd.draw_string(0, 75, "Battery Voltage:" + str(val) + filler, lcd.RED, lcd.BLACK)
+    lcd.draw_string(0, 75, "Battery Voltage:" + str(val/1000)+ "v", lcd.WHITE)
+    print("Battery Voltage:" + str(val/1000) + "v")
+
+    val = axp.getBatteryDischargeCurrent()
+    print("Battery DischargeCurrent:" + str(val) + "mA")
+    lcd.draw_string(0, 90, "DischargeCurrent:" + str(val) +  "mA", lcd.GREEN, lcd.BLACK)
+    val = axp.getUSBInputCurrent()
+    lcd.draw_string(0, 105, "USB InputCurrent:" + str(val)+  "mA", lcd.ORANGE, lcd.BLACK)
+    val = axp.getTemperature()
+    lcd.draw_string(0, 119, "Temperature:" + str(val) + "C", lcd.YELLOW, lcd.BLACK)
+    print("PMU Temperature:" + str(val) + "C")
+
+    val = axp.getUSBVoltage()
+    #lcd.draw_string(0, 30, "USB Voltage:" + str(val) + filler, lcd.WHITE, lcd.BLACK)
+    print("USB Voltage:" + str(val/1000) + "v")
+    val = axp.getUSBInputCurrent()
+    print("USB InputCurrent:" + str(val) + "mA")
+    #lcd.draw_string(0, 45, "USB InputCurrent:" + str(val) + filler, lcd.RED, lcd.BLACK)
+    return
+
+def sys_info_display():
+    show_akku_status()
+    print("#->Image FPS: "+str(clock.fps()) )              # Note: MaixPy's Cam runs about half as fast when connected
+    print("------------- "+str(clock.fps()) )
+    #time.sleep(0.5)
+    return
+
+
+# chdir to "/sd" or "/flash"
+devices = os.listdir("/")
+if "sd" in devices:
+    os.chdir("/sd")
+    sys.path.append('/sd')
+    print("------------------")
+    print("Micro SD detected!")
+    print("------------------")
+    print(os.listdir())
+    TF_Card_OK =True
+else:
+    os.chdir("/flash")
+    print("chdir to /flash")
+sys.path.append('/flash')
+
+if "sd" not in os.listdir("/"):
+    #lcd.draw_string(lcd.width()//2-96,lcd.height()//2-4, "Error: Cannot read SD Card", lcd.WHITE, lcd.RED)
+    print("Error: Cannot read SD Card")
+else:
+    TF_Card_OK = True
+    print("TF_Card_OK")
+#creat folder
+#print("#creat /train and /valid folder")
+#try:
+    #os.mkdir("/sd/train")
+#except Exception as e:
+    #pass
+
+#try:
+    #os.mkdir("/sd/vaild")
+    #print("mkdir:/sd/vaild")
+#except Exception as e:
+    #pass
+
+print("#creat /DCIM_StickV folder")
+try:
+    os.mkdir("/sd/DCIM_StickV")
+except Exception as e:
+    pass
+
+if auto_save:
+    print("#creat /rawautosave folder")
+    try:
+        os.mkdir("/sd/rawautosave")
+    except Exception as e:
+        pass
+
+if (TF_Card_OK == True):
+    try:
+         #currentImage = max(findMaxIDinDir("/sd/train/" + str(currentDirectory)), findMaxIDinDir("/sd/vaild/" + str(currentDirectory))) + 1
+         currentImage = findMaxIDinDir("/sd/rawautosave/")+1
+         print("------------------")
+         print("##: Current image file index: "+str(currentImage))
+         print("------------------")
+         time.sleep(0.5)
+
+    except:
+         currentImage = 0
+         print("Get current image file index failed")
+         pass
+
+
+
+
+
+
 
 lcd.init()
 lcd.rotation(2) #Rotate the lcd 180deg
@@ -81,7 +224,11 @@ try:
 except:
     lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find logo.jpg", lcd.WHITE, lcd.RED)
 
-time.sleep(1.0)
+#time.sleep(0.4)
+
+
+
+time.sleep(0.6)
 
 
 import sensor
@@ -109,27 +256,60 @@ anchor = (1.889, 2.5245, 2.9465, 3.94056, 3.99987, 5.3658, 5.155437, 6.92275, 6.
 # Anchor data is for bbox, extracted from the training sets.
 kpu.init_yolo2(task, 0.5, 0.3, 5, anchor)
 
-but_stu = 1
-
+btnA_status = 1
+btnB_status = 1
+clock = time.clock()
+gc.collect()
+Zeit_base = time.ticks_ms()
 try:
     while(True):
+        clock.tick()
         img = sensor.snapshot() # Take an image from sensor
         bbox = kpu.run_yolo2(task, img) # Run the detection routine
         if bbox:
             for i in bbox:
                 print(i)
                 img.draw_rectangle(i.rect())
+            led_g.value(0)
+        else:
+            led_g.value(1)
+
         lcd.display(img)
 
-        if but_a.value() == 0 and but_stu == 1:
+        if but_a.value() == 0 and btnA_status == 1:
             if led_w.value() == 1:
                 led_w.value(0)
             else:
                 led_w.value(1)
-            but_stu = 0
-        if but_a.value() == 1 and but_stu == 0:
-            but_stu = 1
+            btnA_status = 0
+        if but_a.value() == 1 and btnA_status == 0:
+            btnA_status = 1
+
+
+        if but_b.value() == 0 and btnB_status == 1:
+                led_r.value(0)
+                #led_w.value(1)
+                #save image
+                Foto_save(TF_Card_OK)
+                btnB_status = 0
+        if but_b.value() == 1 and btnB_status == 0:
+            btnB_status = 1
+            led_r.value(1)
+
+        Zeit_jetzt=time.ticks_ms()-Zeit_base
+        if(Zeit_jetzt > Zeit_interval):
+           sys_info_display()
+           time.sleep(0.5)
+           Zeit_base = time.ticks_ms()
+
+
+
+
+
+
 
 except KeyboardInterrupt:
     a = kpu.deinit(task)
     sys.exit()
+
+
