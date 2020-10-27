@@ -1,6 +1,9 @@
 # Untitled - By: ling - Tue Oct 20 2020
 # factory default boot.py file modified by ZL
 
+#version 1.3   2020.20.27 big BtnA to disable face detect
+#version 1.3   2020.20.27 TopBtn to enable QR scan, Grove4 as GPIO_out for white LED light
+#version 1.2   2020.20.26 added QR-code scan, tested OK
 #version 1.1   2020.20.21
 import lcd
 import image
@@ -9,6 +12,7 @@ import uos
 import utime
 import sys
 import gc
+import os
 import pmu
 from Maix import GPIO
 from fpioa_manager import *
@@ -19,13 +23,14 @@ auto_save = False
 save_cnt = 0
 debug_print_EN = False
 QR_detect = False
+Face_detect = True
 TF_Card_OK = False
 Zeit_interval = 10*1000  # 10s interval for sys info display
 #PMU vars
 filler = "          "
 axp = pmu.axp192()
 axp.enableADCs(True)
-
+axp.enablePMICSleepMode(True)
 version_info = sys.version
 print("python version:"+version_info)
 print(os.uname())
@@ -41,7 +46,7 @@ def Foto_save(EN):
 
             gc.collect()
 
-            img.save("/sd/DCIM_StickV/" +str(save_cnt)+ str(Zeit_anfang/1000) + ".bmp")
+            img.save("/sd/DCIM_StickV/" +"OV7740_"+str(save_cnt)+ "_"+str(Zeit_anfang/1000) + ".bmp")
             #time.sleep(0.2)
             save_cnt = save_cnt+1
 
@@ -78,7 +83,10 @@ def show_akku_status():
 def sys_info_display():
     show_akku_status()
     print("#->Image FPS: "+str(clock.fps()) )              # Note: MaixPy's Cam runs about half as fast when connected
-    print("------------- "+str(clock.fps()) )
+    print("GC free mem: "+ str(gc.mem_free()/1000)+"KB")
+    gc.collect()
+    print("------------- " )
+    lcd.draw_string(10,20, "Image FPS: "+str(clock.fps()), lcd.BLACK,lcd.WHITE)
     #time.sleep(0.5)
     return
 
@@ -162,7 +170,7 @@ except:
 
 from Maix import I2S, GPIO
 import audio
-
+print("#: init I2S Audio interface now!")
 fm.register(board_info.SPK_SD, fm.fpioa.GPIO0)
 spk_sd=GPIO(GPIO.GPIO0, GPIO.OUT)
 spk_sd.value(1) #Enable the SPK output
@@ -192,8 +200,8 @@ except:
 fm.register(board_info.BUTTON_A, fm.fpioa.GPIO1)
 but_a=GPIO(GPIO.GPIO1, GPIO.IN, GPIO.PULL_UP) #PULL_UP is required here!
 
-if but_a.value() == 0: #If dont want to run the demo
-    sys.exit()
+#if but_a.value() == 0: #If dont want to run the demo
+    #sys.exit()
 
 fm.register(board_info.BUTTON_B, fm.fpioa.GPIO2)
 but_b = GPIO(GPIO.GPIO2, GPIO.IN, GPIO.PULL_UP) #PULL_UP is required here!
@@ -215,20 +223,64 @@ led_b = GPIO(GPIO.GPIO6, GPIO.OUT)
 led_b.value(1) #RGBW LEDs are Active Low
 
 
-time.sleep(0.5) # Delay for few seconds to see the start-up screen :p
+time.sleep(0.4) # Delay for few seconds to see the start-up screen :p
+
+
+#------------------ Enable or disable QR-scan  -----------------------
+if but_b.value() == 0:
+    QR_detect = True
+    print("QR Scan True!")
+
+#------------------ Enable or disable Face detect  -----------------------
+if but_a.value() == 0:
+    Face_detect = False
+    print("Face detect False!")
 
 try:
-    #img = image.Image("/flash/startup.jpg")
-    img = image.Image("/flash/logo.jpg")
+    #os.chdir("/flash")
+    #os.chdir("/sd")
+    img = image.Image("/sd/logo.jpg")
+    #img = image.Image("/flash/logo.jpg")
     lcd.display(img)
 except:
+    print("#: Error: Cannot find logo.jpg")
     lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find logo.jpg", lcd.WHITE, lcd.RED)
 
 #time.sleep(0.4)
 
+# GROVE pin init as GPIO_out
+#print("GROVE_pin3 and pin4 now set as output GPIOHS13,14" )
+print("GROVE_pin4 now set as output GPIOHS14" )
+GROVE_pin3 = 35 #physical port pin number
+GROVE_pin4 = 34
+# unreg
+#fm.unregister(GROVE_pin3, fm.fpioa.GPIOHS13)
+fm.unregister(GROVE_pin4, fm.fpioa.GPIOHS14)
+
+#fm.register(GROVE_pin3, fm.fpioa.GPIOHS13)
+fm.register(GROVE_pin4, fm.fpioa.GPIOHS14)
+
+#GROVE_3=GPIO(GPIO.GPIOHS13,GPIO.OUT)
+
+GROVE_4=GPIO(GPIO.GPIOHS14,GPIO.OUT)
+#>>> GROVE_3
+#Pin(18)
+#GROVE_3.value(0)
+
+#GROVE_3.value(1)
+#GROVE_3.value()
+
+GROVE_4.value(1)
+#GROVE_4.value() #get 0
+#print("GROVE_pin3_4:"+ str(GROVE_3.value())+str(GROVE_4.value()) )
+print("GROVE_pin4:"+str(GROVE_4.value()) )
 
 
-time.sleep(0.6)
+time.sleep(0.3)
+
+GROVE_4.value(0)
+#GROVE_4.value() #get 0
+print("GROVE_pin4:"+str(GROVE_4.value()) )
 
 
 import sensor
@@ -238,7 +290,8 @@ err_counter = 0
 
 while 1:
     try:
-        sensor.reset() #Reset sensor may failed, let's try sometimes
+        #sensor.reset() #Reset sensor may failed, let's try sometimes
+        sensor.reset(freq=22000000, set_regs=True, dual_buff=True)
         break
     except:
         err_counter = err_counter + 1
@@ -246,9 +299,15 @@ while 1:
             lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Sensor Init Failed", lcd.WHITE, lcd.RED)
         time.sleep(0.1)
         continue
-
+sensor.run(0)
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.QVGA) #QVGA=320x240
+img_w = sensor.width()
+img_h = sensor.height()
+sensor_ID = sensor.get_id()
+if (sensor_ID == 30530):
+    sensor_ID_str = 'OV7740'
+print("image sensor is "+str(sensor_ID_str)+", with size "+str(img_w)+" x "+str(img_h))
 sensor.run(1)
 
 task = kpu.load(0x300000) # Load Model File from Flash
@@ -261,26 +320,65 @@ btnB_status = 1
 clock = time.clock()
 gc.collect()
 Zeit_base = time.ticks_ms()
+
+
+
+
 try:
     while(True):
         clock.tick()
         img = sensor.snapshot() # Take an image from sensor
-        bbox = kpu.run_yolo2(task, img) # Run the detection routine
-        if bbox:
-            for i in bbox:
-                print(i)
-                img.draw_rectangle(i.rect())
-            led_g.value(0)
-        else:
-            led_g.value(1)
+        Target_ROI = ( 40,30,img_w-80,img_h-60)
+        LCD_ROI = ( 40,54,img_w-80,img_h-108)
+        tag_cnt = 0
+        #April_tags = img.find_apriltags()  #must less than 64K pixels, https://maixpy.sipeed.com/en/libs/machine_vision/image.html
+        #if len(April_tags)>0:
+            #img.draw_rectangle(April_tags.rect())
+            #print("Apriltag detected with ID:"+str(April_tags.id()))
+        if(QR_detect):
+            led_b.value(0)
+            img.draw_rectangle(LCD_ROI,color=(160,128,0))
+            QR_tags=img.find_qrcodes(Target_ROI)  #find_qrcodes([roi])   image.find_barcodes([roi])
+            if len(QR_tags)>0:
+                    #print("QR codes version:"+str(QR_tags.version())+" detected with value:"+str(QR_tags.id()))
+                    #gtagsprint("QR code version:"+str(QR_tags[0].version())+", detected with value:"+str(QR_tags[0].payload()))
+                    #img.draw_rectangle(QR_tags.rect())
+                    led_g.value(0)
+                    led_r.value(0)
+                    print("total QR codes found:"+ str(len(QR_tags)))
+                    #img.draw_rectangle(QR_tags[0].rect(),color=(0,220,0))
+                    gui_h = 20
+                    for tags in QR_tags:
+                        print("QR code detected with value:"+str(tags.payload()))
+                        #img.draw_rectangle(QR_tags.rect())
+                        img.draw_rectangle(tags.rect(),color=(0,220,0))
+                        lcd.draw_string(10,gui_h, tags.payload(), lcd.BLUE,lcd.WHITE)
+                        gui_h = gui_h + 40
+            else:
+                    led_g.value(1)
+                    led_r.value(1)
+            led_b.value(1)
+
+        if (Face_detect):
+            bbox = kpu.run_yolo2(task, img) # Run the detection routine
+            if bbox:
+                print("Face detected at:")
+                for i in bbox:
+                    print(i)
+                    img.draw_rectangle(i.rect())
+                led_g.value(0)
+            else:
+                led_g.value(1)
 
         lcd.display(img)
 
         if but_a.value() == 0 and btnA_status == 1:
             if led_w.value() == 1:
                 led_w.value(0)
+                GROVE_4.value(1)
             else:
                 led_w.value(1)
+                GROVE_4.value(0)
             btnA_status = 0
         if but_a.value() == 1 and btnA_status == 0:
             btnA_status = 1
@@ -291,6 +389,8 @@ try:
                 #led_w.value(1)
                 #save image
                 Foto_save(TF_Card_OK)
+                lcd.draw_string(80,40,"Foto Saved :)",lcd.RED,lcd.WHITE)
+                time.sleep(0.1)
                 btnB_status = 0
         if but_b.value() == 1 and btnB_status == 0:
             btnB_status = 1
@@ -303,12 +403,8 @@ try:
            Zeit_base = time.ticks_ms()
 
 
-
-
-
-
-
 except KeyboardInterrupt:
+    print("#->:KeyboardInterrupt!")
     a = kpu.deinit(task)
     sys.exit()
 
