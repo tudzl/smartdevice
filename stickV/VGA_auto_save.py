@@ -268,12 +268,13 @@ try:
 
         Zeit_jetzt=time.ticks_ms()-Zeit_base
         if(Zeit_jetzt > Zeit_interval):
+           print("Image FPS: "+str(clock.fps()) )              # Note: MaixPy's Cam runs about half as fast when connected
            sys_info_display()
            time.sleep(0.5)
            Zeit_base = time.ticks_ms()
 
         #fps =clock.fps()
-        print("Image FPS: "+str(clock.fps()) )              # Note: MaixPy's Cam runs about half as fast when connected
+
 
 except KeyboardInterrupt:
     print("#->:KeyboardInterrupt!")

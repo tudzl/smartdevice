@@ -1,10 +1,12 @@
 # Untitled - By: ling - Tue Oct 20 2020
 # factory default boot.py file modified by ZL
 
-#version 1.3   2020.20.27 big BtnA to disable face detect.
-#version 1.3   2020.20.27 TopBtn to enable QR scan, Grove4 as GPIO_out for white LED light
-#version 1.2   2020.20.26 added QR-code scan, tested OK
-#version 1.1   2020.20.21
+
+#version 2.0   2020.11.03 added sys boot menu Btn sellection program, tested OK!
+#version 1.3   2020.10.27 big BtnA to disable face detect.
+#version 1.3   2020.10.27 TopBtn to enable QR scan, Grove4 as GPIO_out for white LED light
+#version 1.2   2020.10.26 added QR-code scan, tested OK
+#version 1.1   2020.10.21
 import lcd
 import image
 import time
@@ -260,19 +262,20 @@ try:
     lcd.display(img)
 except:
     print("#: Error: Cannot find Boot_menu.jpg")
-    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find logo.jpg", lcd.WHITE, lcd.RED)
+    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find  Boot_menu.jpg", lcd.WHITE, lcd.RED)
 sys_program = boot_menu (200)
 if (1==sys_program):
     print("#: User BtnA was pressed! Will run program 1...")
     lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "User BtnA pressed!", lcd.WHITE, lcd.RED)
     try:
+        lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Load VGA_auto_save.py", lcd.GREEN, lcd.BLACK)
         with open("VGA_auto_save.py") as app:
             exec(app.read())
     except:
         print("#: program 1 execute error! pass...")
         lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "program 1 execute error!", lcd.WHITE, lcd.RED)
         time.sleep(0.6)
-        sys.exit()
+        safsd
 
 
 
@@ -287,6 +290,16 @@ else:
   lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "No user Btn inputs!", lcd.WHITE, lcd.BLACK)
 
 
+
+try:
+    #os.chdir("/flash")
+    #os.chdir("/sd")
+    img = image.Image("/sd/Boot_menu 2.jpg")
+    #img = image.Image("/flash/logo.jpg")
+    lcd.display(img)
+except:
+    print("#: Error: Cannot find Boot_menu 2.jpg")
+    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find Boot_menu 2.jpg", lcd.WHITE, lcd.RED)
 
 
 print("#: Now running second booting process, waiting for user inputs if required!")
