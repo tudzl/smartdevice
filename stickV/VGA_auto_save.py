@@ -1,4 +1,5 @@
 # image sensor Example for StickV
+# V1.2 2020.11.03  zell
 # v1.1 2020.11.02  zell
 # test sensor for Zeit_end = 60*1000, 60 seconds
 # Welcome to the MaixPy IDE!
@@ -206,70 +207,74 @@ lcd.rotation(2) #Rotate the lcd 180deg
 lcd.draw_string(5, 5, "K210 VGA image auto save v1.1" , lcd.GREEN, lcd.BLACK)
 Zeit_base = time.ticks_ms()
 
-while(condition):
-    clock.tick()                    # Update the FPS clock.
-    #Zeit_jetzt=time.ticks_ms()      # get millisecond counter
-    img = sensor.snapshot()         # Take a picture and return the image.
-    lcd.display(img)
+try:
+    while(condition):
+        clock.tick()                    # Update the FPS clock.
+        #Zeit_jetzt=time.ticks_ms()      # get millisecond counter
+        img = sensor.snapshot()         # Take a picture and return the image.
+        lcd.display(img)
 
 
 
-    if but_a.value() == 0 and btnA_status == 1:
-        if led_w.value() == 1:
-            led_w.value(0)
-            auto_save = True
-            lcd.draw_string(5, 5, "Auto save enabled!" , lcd.RED, lcd.BLACK)
-        else:
-            led_w.value(1)
-            auto_save = False
-            lcd.draw_string(5, 5, "Auto save disabled!" , lcd.ORANGE, lcd.BLACK)
+        if but_a.value() == 0 and btnA_status == 1:
+            if led_w.value() == 1:
+                led_w.value(0)
+                auto_save = True
+                lcd.draw_string(5, 5, "Auto save enabled!" , lcd.RED, lcd.BLACK)
+            else:
+                led_w.value(1)
+                auto_save = False
+                lcd.draw_string(5, 5, "Auto save disabled!" , lcd.ORANGE, lcd.BLACK)
 
 
-        btnA_status = 0
-    if but_a.value() == 1 and btnA_status == 0:
-        btnA_status = 1
-
-
-
-    if but_b.value() == 0 and btnB_status == 1:
-        led_r.value(0)
-        #led_w.value(1)
-        #save image
-        Foto_save(TF_Card_OK)
-        lcd.draw_string(80,40,"Foto Saved :)",lcd.RED,lcd.WHITE)
-        time.sleep(0.1)
-        btnB_status = 0
-    if but_b.value() == 1 and btnB_status == 0:
-        btnB_status = 1
-        led_r.value(1)
+            btnA_status = 0
+        if but_a.value() == 1 and btnA_status == 0:
+            btnA_status = 1
 
 
 
+        if but_b.value() == 0 and btnB_status == 1:
+            led_r.value(0)
+            #led_w.value(1)
+            #save image
+            Foto_save(TF_Card_OK)
+            lcd.draw_string(80,40,"Foto Saved :)",lcd.RED,lcd.WHITE)
+            time.sleep(0.1)
+            btnB_status = 0
+        if but_b.value() == 1 and btnB_status == 0:
+            btnB_status = 1
+            led_r.value(1)
 
 
 
-    if auto_save:
-       Zeit_tmp = time.ticks_ms()- Zeit_passed
-       if (Zeit_tmp > Zeit_interval):
-         if TF_Card_OK:
-            print("---------------------------")
-            print("#:auto write raw: Image "+str(autosave_cnt)+" saved to SD card!")
-            print("---------------------------")
-            gc.collect()
-            led_b.value(0)
-            img.save("/sd/rawautosave/" +str(autosave_cnt)+ str(Zeit_jetzt/1000) + ".bmp")
-            #time.sleep(0.2)
-            autosave_cnt = autosave_cnt+1
 
-            Zeit_passed = time.ticks_ms()
-            led_b.value(1)
 
-    Zeit_jetzt=time.ticks_ms()-Zeit_base
-    if(Zeit_jetzt > Zeit_interval):
-       sys_info_display()
-       time.sleep(0.5)
-       Zeit_base = time.ticks_ms()
 
-    #fps =clock.fps()
-    print("Image FPS: "+str(clock.fps()) )              # Note: MaixPy's Cam runs about half as fast when connected
+        if auto_save:
+           Zeit_tmp = time.ticks_ms()- Zeit_passed
+           if (Zeit_tmp > Zeit_interval):
+             if TF_Card_OK:
+                print("---------------------------")
+                print("#:auto write raw: Image "+str(autosave_cnt)+" saved to SD card!")
+                print("---------------------------")
+                gc.collect()
+                led_b.value(0)
+                img.save("/sd/rawautosave/" +str(autosave_cnt)+ str(Zeit_jetzt/1000) + ".bmp")
+                #time.sleep(0.2)
+                autosave_cnt = autosave_cnt+1
 
+                Zeit_passed = time.ticks_ms()
+                led_b.value(1)
+
+        Zeit_jetzt=time.ticks_ms()-Zeit_base
+        if(Zeit_jetzt > Zeit_interval):
+           sys_info_display()
+           time.sleep(0.5)
+           Zeit_base = time.ticks_ms()
+
+        #fps =clock.fps()
+        print("Image FPS: "+str(clock.fps()) )              # Note: MaixPy's Cam runs about half as fast when connected
+
+except KeyboardInterrupt:
+    print("#->:KeyboardInterrupt!")
+    sys.exit()

@@ -1,7 +1,7 @@
 # Untitled - By: ling - Tue Oct 20 2020
 # factory default boot.py file modified by ZL
 
-#version 1.3   2020.20.27 big BtnA to disable face detect
+#version 1.3   2020.20.27 big BtnA to disable face detect.
 #version 1.3   2020.20.27 TopBtn to enable QR scan, Grove4 as GPIO_out for white LED light
 #version 1.2   2020.20.26 added QR-code scan, tested OK
 #version 1.1   2020.20.21
@@ -89,6 +89,32 @@ def sys_info_display():
     lcd.draw_string(10,20, "Image FPS: "+str(clock.fps()), lcd.BLACK,lcd.WHITE)
     #time.sleep(0.5)
     return
+
+# user btns to sellect different system boot program, 2020.11.02
+def boot_menu(cnt):
+    global but_a, but_b
+    res =0
+    print("#->Waiting for user input!" )              # Note: MaixPy's Cam runs about half as fast when connected
+    print("#: BtnA big btn for VGA Program, Btn B for QVGA program" )
+    lcd.draw_string(10,100, "Waiting for user Btns, A or B?", lcd.ORANGE,lcd.WHITE)
+    while (cnt):
+        try:
+            if but_a.value() == 0:
+                print("Btn A pressed!")
+                res =1
+                break
+            if but_b.value() == 0:
+                res = 2
+                print("Btn B pressed!")
+                break
+            cnt = cnt -1
+            time.sleep(0.01)
+        except:
+            pass
+
+    lcd.draw_string(10,120, "Btn valid: "+str(res), lcd.BLACK,lcd.WHITE)
+    time.sleep(0.5)
+    return res
 
 
 # chdir to "/sd" or "/flash"
@@ -225,16 +251,71 @@ led_b.value(1) #RGBW LEDs are Active Low
 
 time.sleep(0.4) # Delay for few seconds to see the start-up screen :p
 
+#added 2020.11.03
+try:
+    #os.chdir("/flash")
+    #os.chdir("/sd")
+    img = image.Image("/sd/Boot_menu.jpg")
+    #img = image.Image("/flash/logo.jpg")
+    lcd.display(img)
+except:
+    print("#: Error: Cannot find Boot_menu.jpg")
+    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Error: Cannot find logo.jpg", lcd.WHITE, lcd.RED)
+sys_program = boot_menu (200)
+if (1==sys_program):
+    print("#: User BtnA was pressed! Will run program 1...")
+    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "User BtnA pressed!", lcd.WHITE, lcd.RED)
+    try:
+        with open("VGA_auto_save.py") as app:
+            exec(app.read())
+    except:
+        print("#: program 1 execute error! pass...")
+        lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "program 1 execute error!", lcd.WHITE, lcd.RED)
+        time.sleep(0.6)
+        sys.exit()
 
-#------------------ Enable or disable QR-scan  -----------------------
-if but_b.value() == 0:
-    QR_detect = True
-    print("QR Scan True!")
 
-#------------------ Enable or disable Face detect  -----------------------
-if but_a.value() == 0:
+
+elif (2 == sys_program):
+    print("#: User BtnB was pressed!Will run program 2...")
+    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "User BtnB pressed!", lcd.WHITE, lcd.RED)
+    #with open("app.py") as app:
+        #exec(app.read())
+
+else:
+  print("#: No user Btn inputs detected! Run default programs")
+  lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "No user Btn inputs!", lcd.WHITE, lcd.BLACK)
+
+
+
+
+print("#: Now running second booting process, waiting for user inputs if required!")
+
+face_program = boot_menu (200)
+if (1==face_program):
+    print("#: User BtnA was pressed! Will disable face detection1")
     Face_detect = False
-    print("Face detect False!")
+    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "Face_detect False", lcd.WHITE, lcd.RED)
+
+elif (2 == face_program):
+    print("#: User BtnB was pressed! QR_detect True")
+    QR_detect = True
+    lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "QR_detect True", lcd.WHITE, lcd.RED)
+
+else:
+  print("#: No user Btn inputs detected! Run default face detect programs")
+  lcd.draw_string(lcd.width()//2-100,lcd.height()//2-4, "No user Btn inputs!", lcd.WHITE, lcd.BLACK)
+
+
+##------------------ Enable or disable QR-scan  -----------------------
+#if but_b.value() == 0:
+    #QR_detect = True
+    #print("QR Scan True!")
+
+##------------------ Enable or disable Face detect  -----------------------
+#if but_a.value() == 0:
+    #Face_detect = False
+    #print("Face detect False!")
 
 try:
     #os.chdir("/flash")
@@ -291,7 +372,7 @@ err_counter = 0
 while 1:
     try:
         #sensor.reset() #Reset sensor may failed, let's try sometimes
-        sensor.reset(freq=22000000, set_regs=True, dual_buff=True)
+        sensor.reset(freq=20000000, set_regs=True, dual_buff=True)
         break
     except:
         err_counter = err_counter + 1
@@ -407,5 +488,3 @@ except KeyboardInterrupt:
     print("#->:KeyboardInterrupt!")
     a = kpu.deinit(task)
     sys.exit()
-
-
