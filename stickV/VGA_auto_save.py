@@ -39,7 +39,7 @@ axp.enableADCs(True)
 axp.enablePMICSleepMode(True)
 
 def Foto_save(EN):
-    global save_cnt
+    global save_cnt,img
     Zeit_anfang = time.ticks_ms()
     if EN:
             print("---------------------------")
@@ -212,7 +212,8 @@ try:
         clock.tick()                    # Update the FPS clock.
         #Zeit_jetzt=time.ticks_ms()      # get millisecond counter
         img = sensor.snapshot()         # Take a picture and return the image.
-        lcd.display(img)
+        img_s = img.resize(240,180)
+        lcd.display(img_s)
 
 
 
