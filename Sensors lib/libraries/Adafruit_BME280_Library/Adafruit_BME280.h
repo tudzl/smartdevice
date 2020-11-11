@@ -210,7 +210,7 @@ public:
   float readTemperature(void);
   float readPressure(void);
   float readHumidity(void);
-
+  double CalcAltitude(double pressure, float seaLevel); //by zell
   float readAltitude(float seaLevel);
   float seaLevelForAltitude(float altitude, float pressure);
   uint32_t sensorID(void);
