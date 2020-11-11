@@ -4,8 +4,10 @@
     Problem list： To add WiFiMQTTManager.h( related esp8266 lib is problemmatic!
     TO DO TASK:  3. ESP32-->PIC UART communication! 4. Max30205 limit alert setting function
     Doing now: 3.ESP32-->PIC UART communication
+    Version 10.5 added sea level, altitude for LPS33HW sensor, see https://www.meteoblue.com/en/weather/webmap/hangzhou_china_1808926?variable=mslp_pressure&level=surface&lines=none&mapcenter=30.2951N120.1509&zoom=6
+                 changed BME280 lib funct
     Version 10.4 OLED GUI improve,  buttonA/S1 function modified, need test, 2020.10.15
-    Version 10.4 SSD1351 128*128 new GUI with mic ADC value display
+    Version 10.3b SSD1351 128*128 new GUI with mic ADC value display
     Version 10.3 improved GUI OLED status display
     Version 10.1 add NTP: 0.cn.pool.ntp.org
     Version 10.0 add ssd1331 0.95 RGB OLED（0.95 cost 59 RMB, 1.5 zoll 128*128 cost 89 @2020 Taobao)
@@ -124,7 +126,7 @@
 //WIFI+MQTT
 #define MQTT_KEEPALIVE 30
 #include <WiFi.h>
-#include <PubSubClient.h>  //MQTT
+#include <PubSubClient.h>  //MQTT lib;  #include <ArduinoMqttClient.h> ??
 
 //#include <WiFiMQTTManager.h> //wifi config save, need ArduinoJson , WiFiManager
 //mqtt.subscribe(str('stsmd/'+Device_ID+'/alert')
@@ -175,7 +177,7 @@ bool OLED_HWSPI_EN = true;
 #define BLUE            0x001F
 #define BLUE2           0x051F
 #define RED             0xF800
-#define LightRED             0xF80C
+#define LightRED        0xF80C
 #define GREEN           0x07E0
 #define BGREEN          0x057A
 #define DARKGREEN       0x07F0
@@ -232,7 +234,7 @@ const uint8_t H_msg0_status =  8;
 const uint8_t H_msg1_status =  16;
 const uint8_t H_msg2_status =  24;
 const uint8_t H_msg3_status =  32;
-const uint8_t X2_msg3_status =  64;  //X pos for second data display @H_msg3_status
+const uint8_t X2_msg3_status =  64+6;  //X pos for second data display @H_msg3_status, N= *** noise level
 const uint8_t H_msg4_status =  48;
 const uint8_t H_msg5_status =  56;
 const uint8_t H_sys_msg1 = OLED_height - 32; //40
@@ -243,10 +245,12 @@ const uint8_t X_pos_wifi_icon = 116;
 const uint8_t Y_pos_wifi_icon = 124;
 
 //-------------------sensor related
-const float BME280_Hum_offset = 11.2 ; // calibration with Fluke 971, 2019.12.4 for #5 PCB
-const float BME280_Hum_comp = 4.2;
-// Hum seem to be compenstaed to +BME280_Hum_comp*(T_BME-T_max30205) 2020.10.15
+const float BME280_Hum_offset = 11.2 ; // calibration with Fluke 971, 2019.12.4 for #10 PCB
+const float BME280_Hum_offset2 = 18.9 ; // calibration with Fluke 971, 2019.12.4 for #10 PCB
+const float BME280_Hum_comp = 4.25;
+// Hum seem to be compenstaed to +BME280_Hum_comp*(T_BME-T_max30205) 2020.10.15 if T_BME>T_max30205
 
+#define SEALEVELPRESSURE_HZ (1029)
 #define SEALEVELPRESSURE_HPA (1013.25)
 //bmp280 address:  0x76
 //HP206C address:  0x76
@@ -308,6 +312,7 @@ unsigned int MAX30205_Range_L = 0;
 float MAX30205_TOV = 27;
 float MAX30205_HYST = 26;
 double Altitude = 0; // in meter @ 25 degree
+double Altitude_LPS = 0; // from LPS33HW in meter @ 25 degree
 double Altitude_offset = 0;   // in meter
 bool top_light_ok = false;  //BH
 bool bot_light_ok = false; //max
@@ -317,7 +322,7 @@ bool bmp280_ok = false;
 bool bme680_ok =  false;
 bool HP206_ok = false;
 bool MCP9808_ok = false;
-bool MCP9808_ENA = false; // enable or disable MCP9808 sensor
+bool MCP9808_ENA = true; // enable or disable MCP9808 sensor
 bool ICM20948_ok = false;
 bool MLX90614_ok = false;
 bool mfrc522_ok = false;
@@ -373,7 +378,7 @@ unsigned int HP206_DSR = 256; // down sampling rate
 float MCP9808_T = 0;
 int16_t T_limit_H = 40;
 int16_t T_limit_L = 5;
-int16_t T_limit_Critical = 50;
+int16_t T_limit_Critical = 45;
 
 float bme680_T_offset = 5;
 unsigned int Gas = 0;
@@ -391,17 +396,21 @@ bool filter_on = true;
 ZFilter t_filter;    //temperature filter
 ZFilter p_filter;    //pressure filter
 ZFilter a_filter;    //altitude filter
+ZFilter lps_filter;    //altitude filter for LPS
 KalmanFilter t_kalman;    //temperature filter
 KalmanFilter p_kalman;    //pressure filter
 KalmanFilter a_kalman;    //altitude filter
 float T_filter = 0;
 float P_filter = 0;
 float A_filter = 0;
+float LPS_A_filter = 0;
 float T_Kfilter = 0;
 float P_Kfilter = 0;
 float A_Kfilter = 0;
+//float LPS_A_Kfilter = 0;
 #define Filter_len 5
 float filter_buf[Filter_len];
+float filter_buf2[Filter_len];
 float filter_val = 0; //average value
 unsigned int idx = 0;
 //POWER.ShutdownTime SHDT；
@@ -648,7 +657,7 @@ void Wifi_icon_display (bool status) {
   }
   else {
     display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 6, X_pos_wifi_icon, Y_pos_wifi_icon, ORANGE);
-    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 2, Y_pos_wifi_icon, ORANGE);
+    display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 2, Y_pos_wifi_icon, BROWN);
     display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 6, X_pos_wifi_icon + 4, Y_pos_wifi_icon, LightRED);
   }
 
@@ -694,12 +703,6 @@ void connect_wifi(void) {
     Serial.println("WiFi config set to 0 (new received configeration)!");
     writeFile(FFat, "/Wifi_config_Nr.txt", 0);
     Serial.println("WiFi config save to Wifi_config_Nr.txt !");
-    //display.drawLine(X_pos_wifi_icon, Y_pos_wifi_icon - 7, X_pos_wifi_icon, Y_pos_wifi_icon, GREEN);
-    //display.drawLine(X_pos_wifi_icon + 2, Y_pos_wifi_icon - 4, X_pos_wifi_icon + 2, Y_pos_wifi_icon, GREEN);
-    //display.drawLine(X_pos_wifi_icon + 4, Y_pos_wifi_icon - 2, X_pos_wifi_icon + 4, Y_pos_wifi_icon, GREEN);
-    //display.drawPixel(X_pos_wifi_icon, Y_pos_wifi_icon, GREEN);
-    //display.drawPixel(X_pos_wifi_icon+1, Y_pos_wifi_icon+1, GREEN);
-
 
   }
   else  {
@@ -709,8 +712,6 @@ void connect_wifi(void) {
     //char * tmpmsg= wifi_config_num;
     writeFile(FFat, "/Wifi_config_Nr.txt", &wifi_config_num);
     Serial.printf("WiFi config restored to default setting %d !\r\n", wifi_config_num);
-    //display.drawPixel(X_pos_wifi_icon, Y_pos_wifi_icon, ORANGE);
-    //display.drawPixel(X_pos_wifi_icon+1, Y_pos_wifi_icon+1, ORANGE);
   }
   Wifi_icon_display(wifi_ok);
   Zeit = float(millis() - Zeit_anfang) / 1000.0f;
@@ -1164,23 +1165,26 @@ void setup() {
     //MCP9808.shutdown();
     //MCP9808.wakeup();   // wake up, delay 250ms; ready to read!
     Serial.println("* MCP9808 -40°C to +125°C ±0.5°C Digital Temperature Sensor is connected!");
-    Serial.printf("  MCP9808 Chip Rev.: %d \r\n", MCP9808.getRevision(MCP9808_add));
-
+    Serial.printf("  MCP9808 Chip ID: %d \r\n", MCP9808.read16(MCP9808_REG_DEVICE_ID) >> 8); //MCP9808_REG_DEVICE_ID
+    Serial.printf("  MCP9808 Chip Rev.: %d \r\n", MCP9808.getRevision(MCP9808_add));//MCP9808_REG_DEVICE_ID
     Serial.println("-- MCP9808 default Resolution setting: 0.0625°C");
     Serial.println("-- MCP9808 default Sampling Time:  250 ms");
     Serial.println("-- MCP9808 configuring now...");
-
-    MCP9808.setResolution(3); // sets the resolution mode of reading, the modes are defined in the table bellow:
+    Serial.print("-- MCP9808 T upper, lower, critical limit is:");
+    Serial.printf("%d, %d, %d\r\n", T_limit_H, T_limit_L, T_limit_Critical);
+    MCP9808.setResolution(2); // sets the resolution mode of reading, the modes are defined in the table bellow:
     // Mode Resolution SampleTime
     //  0    0.5°C       30 ms
     //  1    0.25°C      65 ms
     //  2    0.125°C     130 ms
     //  3    0.0625°C    250 ms
-
-    MCP9808.write16(MCP9808_REG_CONFIG, MCP9808_REG_CONFIG_ALERTCTRL);
+    //config alert output enable for critical temp!
+    MCP9808.write16(MCP9808_REG_CONFIG, MCP9808_REG_CONFIG_ALERTCTRL + MCP9808_REG_CONFIG_ALERTSEL);
     delay(1);
     //config thresholds
-    uint16_t regval = T_limit_H * 4; //0.25 C step
+    uint16_t regval = 0;
+    regval = T_limit_H * 4; //0.25 C step  40 degree
+    //uint16_t regval = T_limit_H * 16; //0.0625 C step
     regval = regval << 2; //shit left 2 bits
     //Serial.printf("  regval: %d \r\n", regval);
     MCP9808.write16(MCP9808_REG_UPPER_TEMP, regval);
@@ -1192,20 +1196,24 @@ void setup() {
     MCP9808.write16(MCP9808_REG_CRIT_TEMP, regval);
 
     regval = MCP9808.read16(MCP9808_REG_CONFIG);
-    Serial.printf("  MCP9808 Config REG: %d \r\n", regval);
+    Serial.printf("  MCP9808 Config REG(16bits): %d \r\n", regval);
     regval = MCP9808.read16(MCP9808_REG_UPPER_TEMP);
-    Serial.printf("  MCP9808 hight temp. alert reg: %d \r\n", regval);
+    Serial.printf("  MCP9808 hight temp. alert reg(16bits): %d \r\n", regval);
     uint8_t resolution = MCP9808.getResolution();
-    Serial.printf("  MCP9808 Resolution: %d (0 to 3, 3 means 0.0625°C)\r\n", resolution);
-    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
-    delay(50);
-        if (OLED_HWSPI_EN) {
-      display.setTextColor(YELLOW, BLACK); //textcolor and bg color
+    Serial.printf("  MCP9808 Resolution: %d (0 to 3 means 0.5°C, 0.25°C  0.125°C  0.0625°C)\r\n", resolution);
+    MCP9808.wake();   // wake up, ready to read!
+    delay(70);
+    if (OLED_HWSPI_EN) {
+      display.setTextColor(LightRED, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(1, H_msg3_status+8 );
-      display.print("MAX30205 init OK");
+      display.setCursor(1, H_msg3_status );
+      display.print("MCP9808 init OK");
 
     }
+    float tc = MCP9808.readTempC();
+    Serial.printf("MCP9808 Temp: %.2f \r\n", tc); // need to -128 -64?  raw 52728 DEC,  T is xxxx 1101 1111 1000
+    Serial.printf("MCP9808 Temp Reg raw: %d \r\n", MCP9808.read16(MCP9808_REG_AMBIENT_TEMP));
+    Serial.println("^^^^^^^^^^^^$$$$$$$$$$$$^^^^^^^^^^^^^^^");
   }
   else {
     Serial.println("Couldn't find MCP9808! Check your connections and verify the IIC address 0x19 is correct.");
@@ -1367,7 +1375,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(YELLOW, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(1, H_msg5_status+8 );
+      display.setCursor(1, H_msg5_status + 8 );
       display.print("MAX30205 init OK");
 
     }
@@ -1386,7 +1394,7 @@ void setup() {
     if (OLED_HWSPI_EN) {
       display.setTextColor(ORANGE, BLACK); //textcolor and bg color
       display.setTextSize(0);
-      display.setCursor(1, H_msg5_status+16 );
+      display.setCursor(1, H_msg5_status + 16 );
       display.print("MLX90614 init OK");
 
     }
@@ -1543,6 +1551,7 @@ void setup() {
     display.fillRect(1, 1, display.width() - 2, display.height() - 2 , BLACK);
     display.setTextSize(1);
     display.setCursor(8, 1);
+    display.setTextColor(MilkWhite);
     display.print("SmartDevice 2020");
     Wifi_icon_display (wifi_ok);
     //display.setTextColor(RED);
@@ -1612,26 +1621,32 @@ void loop() {
     temperature = bme280.readTemperature();
     hum = bme280.readHumidity();
     //hum += BME280_Hum_offset; //disabled  2020.10.15
-    if (MAX30205_ok)
-      hum_comp = hum + BME280_Hum_comp * (temperature - T_max30205);
+    if (MAX30205_ok) {
+      if (temperature > T_max30205)
+        hum_comp = hum + BME280_Hum_comp * (temperature - T_max30205);
+      else
+        hum_comp = hum + BME280_Hum_offset2;
+    }
     else
       hum_comp = hum + BME280_Hum_offset;
-    if (hum_comp > 99) hum_comp = 99;
+    if (hum_comp > 100) hum_comp = 99.9;
     else if (hum_comp < 0) hum_comp = 0;
     pressure = (float)bme280.readPressure() / 100.0; // in hPA
-    Altitude = (float)bme280.readAltitude(SEALEVELPRESSURE_HPA) ;
+    Altitude = (float) bme280.CalcAltitude(pressure, SEALEVELPRESSURE_HZ) ;
+    //Altitude = (float)bme280.readAltitude(SEALEVELPRESSURE_HPA) ;
     Serial.printf("BME280 Temp. = %.2f°C ; Humidity= %.2f %%  ;pressure= %.2f hpa\r\n", temperature, hum, pressure);
     Serial.printf("Altitude= %6.2f M \r\n", Altitude);
+    Serial.printf("Compensated humidity= %.2f %% \r\n", hum_comp);
 
     if (filter_on) {
       //ZFilter
       //T_filter = t_filter.Filter(temperature);
       P_filter = p_filter.Filter(pressure);
       A_filter = a_filter.Filter(Altitude);
-      // kalman filter
+      // kalman filter, debug, test
       //T_Kfilter = t_kalman.Filter(temperature);
-      P_Kfilter = p_kalman.Filter(pressure);
-      A_Kfilter = a_kalman.Filter(Altitude);
+      //P_Kfilter = p_kalman.Filter(pressure);
+     // A_Kfilter = a_kalman.Filter(Altitude);
       //renew filters， pop out last idx value(oldest)
       for (idx = Filter_len - 1; idx > 0; idx--) {
         filter_buf[idx] = filter_buf[idx - 1];
@@ -1652,12 +1667,12 @@ void loop() {
     }
 
     if (OLED_HWSPI_EN) {
-      display.setTextColor(ORANGE, BLACK); //textcolor and bg color
+      display.setTextColor(RED, BLACK); //textcolor and bg color
       display.setTextSize(0);
       display.setCursor(1, H_msg0_status );
-      display.printf("T:%.2f,", temperature);
+      display.printf("T:%.2f C,", temperature);
       display.setTextColor(GREEN, BLACK); //textcolor and bg color
-      display.setCursor(OLED_width / 2 + 2, H_msg0_status );
+      display.setCursor(OLED_width / 2 + 6, H_msg0_status );
       display.printf("H:%.1f%%", hum);
       display.setCursor(1, H_msg1_status );
       display.setTextColor(BROWN, BLACK); //textcolor and bg color
@@ -1669,7 +1684,7 @@ void loop() {
       display.setTextSize(2);
       display.setTextColor(GREEN, BLACK); //textcolor and bg color
       display.setCursor(1, H_msg5_status + 16 );
-      display.printf("Hu:%.1f %%", hum_comp);
+      display.printf("Hu:%.1f %% ", hum_comp);
 
     }
 
@@ -1691,7 +1706,28 @@ void loop() {
   if (LPS_sensor_ok) {
     pressure_lps = lps.readPressure();  // hPa
     temperature_lps = lps.readTemp();  // °C
-    Serial.printf("LPS33HW Temp. = %.2f°C ;pressure= %.4f hpa\r\n", temperature_lps, pressure_lps);
+
+    Altitude_LPS = bme280.CalcAltitude(pressure_lps, SEALEVELPRESSURE_HZ);
+    if (filter_on) {
+       LPS_A_filter = lps_filter.Filter(Altitude_LPS);
+             for (idx = Filter_len - 1; idx > 0; idx--) {
+        filter_buf2[idx] = filter_buf2[idx - 1];
+      }
+      filter_buf2[0] = LPS_A_filter;//fill
+      //calc average values
+      filter_val = 0;
+      for (idx = 0; idx < Filter_len; idx++) {
+        filter_val = filter_val + filter_buf2[idx];
+      }
+      LPS_A_filter = filter_val / Filter_len;
+    }
+
+    display.setTextSize(0);
+    display.setTextColor(Rose, BLACK); //textcolor and bg color
+    display.setCursor(1, H_msg5_status + 32 );
+    display.printf("LPS:%.3f@%.2fM", pressure_lps, LPS_A_filter);
+    Serial.printf("LPS33HW Temp. = %.2f°C ;pressure= %.4f hpa, Altitude = %.2f m\r\n", temperature_lps, pressure_lps, Altitude_LPS);
+
   }
 
 
@@ -1832,11 +1868,11 @@ void loop() {
 
   //-------------MCP9808 TA bugs!------------
   if (MCP9808_ok && MCP9808_ENA) {
-    MCP9808_T = MCP9808.readTemperature();
-    Serial.printf("MCP9808 PCB Temperature =  %.2f °C\r\n", MCP9808_T);
-    Serial.printf("%%%MCP9808 Temperature raw =  %d  \r\n", MCP9808.readTempRaw());
+    MCP9808_T = MCP9808.readTemperature() - 128 - 64;
+    Serial.printf("MCP9808 PCB Temperature =  %.2f °C (raw:%d)\r\n", MCP9808_T, MCP9808.readTempRaw());
+    //Serial.printf("%%%MCP9808 Temperature raw =  %d  \r\n", MCP9808.readTempRaw());
     //uint16_t regval = MCP9808.read16(MCP9808_REG_CONFIG);
-    Serial.printf("  MCP9808 Config REG: %d \r\n", MCP9808.read16(MCP9808_REG_CONFIG));
+    //Serial.printf("MCP9808 Config REG: %d \r\n", MCP9808.read16(MCP9808_REG_CONFIG));
     //
     //MCP9808.shutdown();
     //tests only
